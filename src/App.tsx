@@ -60,6 +60,7 @@ import {
 } from './constants';
 import { soundManager } from './sounds';
 import { exportHabitsToCSV, exportTasksToCSV } from './exportToSheets';
+import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './googleSheetsSync';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -313,6 +314,8 @@ const getXPForLevel = (level: number) => level * level * 150;
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history'>('home');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [syncSettings, setSyncSettings] = useState<SyncSettings>(getSyncSettings);
+  const [syncStatus, setSyncStatus] = useState<string>('');
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -494,7 +497,21 @@ export default function App() {
       claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
     };
 
-    setDailyMetrics(prev => ({ ...prev, [targetDate]: updatedMetrics }));
+    setDailyMetrics(prev => {
+      const newMetrics = { ...prev, [targetDate]: updatedMetrics };
+      
+      // Auto-sync if enabled
+      if (syncSettings.autoSync && syncSettings.sheetUrl) {
+        syncAllData(newMetrics, tasks, syncSettings.sheetUrl).then(result => {
+          if (result.success) {
+            setSyncStatus('✓ Synced');
+            setTimeout(() => setSyncStatus(''), 2000);
+          }
+        });
+      }
+      
+      return newMetrics;
+    });
     
     if (xpDiff > 0) {
       soundManager.play('xpGain'); // Sound effect!
@@ -1044,14 +1061,40 @@ export default function App() {
             >
               <TasksTab 
                 tasks={tasks}
-                onAddTask={(task) => setTasks(prev => [task, ...prev])}
+                onAddTask={(task) => {
+                  setTasks(prev => {
+                    const newTasks = [task, ...prev];
+                    // Auto-sync if enabled
+                    if (syncSettings.autoSync && syncSettings.sheetUrl) {
+                      syncAllData(dailyMetrics, newTasks, syncSettings.sheetUrl).then(result => {
+                        if (result.success) {
+                          setSyncStatus('✓ Synced');
+                          setTimeout(() => setSyncStatus(''), 2000);
+                        }
+                      });
+                    }
+                    return newTasks;
+                  });
+                }}
                 onToggleTask={(taskId) => {
                   const task = tasks.find(t => t.id === taskId);
                   if (task && !task.completed) {
                     // Mark as completed
-                    setTasks(prev => prev.map(t => 
-                      t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
-                    ));
+                    setTasks(prev => {
+                      const newTasks = prev.map(t => 
+                        t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
+                      );
+                      // Auto-sync if enabled
+                      if (syncSettings.autoSync && syncSettings.sheetUrl) {
+                        syncAllData(dailyMetrics, newTasks, syncSettings.sheetUrl).then(result => {
+                          if (result.success) {
+                            setSyncStatus('✓ Synced');
+                            setTimeout(() => setSyncStatus(''), 2000);
+                          }
+                        });
+                      }
+                      return newTasks;
+                    });
                     // Award XP
                     updateTotalXP(task.xpReward);
                     // 2% chance of Pokemon drop
@@ -1060,7 +1103,21 @@ export default function App() {
                     }
                   }
                 }}
-                onDeleteTask={(taskId) => setTasks(prev => prev.filter(t => t.id !== taskId))}
+                onDeleteTask={(taskId) => {
+                  setTasks(prev => {
+                    const newTasks = prev.filter(t => t.id !== taskId);
+                    // Auto-sync if enabled
+                    if (syncSettings.autoSync && syncSettings.sheetUrl) {
+                      syncAllData(dailyMetrics, newTasks, syncSettings.sheetUrl).then(result => {
+                        if (result.success) {
+                          setSyncStatus('✓ Synced');
+                          setTimeout(() => setSyncStatus(''), 2000);
+                        }
+                      });
+                    }
+                    return newTasks;
+                  });
+                }}
               />
             </motion.div>
           )}
@@ -1074,6 +1131,21 @@ export default function App() {
               <HistoryTab 
                 metrics={dailyMetrics} 
                 tasks={tasks}
+                syncSettings={syncSettings}
+                syncStatus={syncStatus}
+                onSyncSettingsChange={(settings) => {
+                  setSyncSettings(settings);
+                  saveSyncSettings(settings);
+                }}
+                onManualSync={() => {
+                  if (syncSettings.sheetUrl) {
+                    setSyncStatus('Syncing...');
+                    syncAllData(dailyMetrics, tasks, syncSettings.sheetUrl).then(result => {
+                      setSyncStatus(result.success ? '✓ Synced!' : '✗ Failed');
+                      setTimeout(() => setSyncStatus(''), 3000);
+                    });
+                  }
+                }}
                 onDelete={(date) => setEntryToDelete(date)} 
                 onReset={() => setShowResetConfirm(true)} 
                 onEditDate={(date) => {
@@ -2948,9 +3020,13 @@ function BossTab({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, tasks, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ metrics, tasks, syncSettings, syncStatus, onSyncSettingsChange, onManualSync, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
+  syncSettings: SyncSettings,
+  syncStatus: string,
+  onSyncSettingsChange: (settings: SyncSettings) => void,
+  onManualSync: () => void,
   onDelete: (date: string) => void,
   onReset: () => void,
   onEditDate: (date: string) => void
@@ -3147,6 +3223,51 @@ function HistoryTab({ metrics, tasks, onDelete, onReset, onEditDate }: {
             </div>
           ))
         )}
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Google Sheets Sync</h3>
+          {syncStatus && (
+            <span className="text-xs font-bold text-green-600">{syncStatus}</span>
+          )}
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-2 block">Apps Script URL</label>
+            <input
+              type="url"
+              value={syncSettings.sheetUrl}
+              onChange={(e) => onSyncSettingsChange({ ...syncSettings, sheetUrl: e.target.value })}
+              placeholder="https://script.google.com/macros/s/..."
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+            <span className="text-sm font-bold text-slate-700">Auto-sync on every update</span>
+            <button
+              onClick={() => onSyncSettingsChange({ ...syncSettings, autoSync: !syncSettings.autoSync })}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                syncSettings.autoSync ? 'bg-green-500' : 'bg-slate-300'
+              }`}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                syncSettings.autoSync ? 'translate-x-6' : ''
+              }`} />
+            </button>
+          </div>
+          <button
+            onClick={onManualSync}
+            disabled={!syncSettings.sheetUrl}
+            className="w-full py-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            🔄 Sync Now
+          </button>
+          <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-xl">
+            <strong>Setup:</strong> Create a Google Apps Script web app and paste the URL above. 
+            <a href="#" className="text-blue-600 hover:underline ml-1">View instructions</a>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
