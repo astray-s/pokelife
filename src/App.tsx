@@ -1073,6 +1073,7 @@ export default function App() {
             >
               <HistoryTab 
                 metrics={dailyMetrics} 
+                tasks={tasks}
                 onDelete={(date) => setEntryToDelete(date)} 
                 onReset={() => setShowResetConfirm(true)} 
                 onEditDate={(date) => {
@@ -2527,7 +2528,7 @@ function TasksTab({
 
   const getCategoryIcon = (category: TaskCategory) => {
     switch (category) {
-      case 'business': return '�';
+      case 'business': return '💼';
       case 'school': return '🎓';
       case 'admin': return '📋';
       case 'learning': return '📚';
@@ -2947,8 +2948,9 @@ function BossTab({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ metrics, tasks, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
+  tasks: Task[],
   onDelete: (date: string) => void,
   onReset: () => void,
   onEditDate: (date: string) => void
@@ -3161,7 +3163,7 @@ function HistoryTab({ metrics, onDelete, onReset, onEditDate }: {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <button 
-            onClick={() => exportHabitsToCSV(dailyMetrics)}
+            onClick={() => exportHabitsToCSV(metrics)}
             className="flex-1 py-3 bg-green-50 text-green-700 rounded-xl font-bold text-sm hover:bg-green-100 transition-all flex items-center justify-center gap-2"
           >
             📊 Export Habits to CSV
