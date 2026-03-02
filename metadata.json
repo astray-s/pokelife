@@ -1,0 +1,5 @@
+{
+  "name": "PokeProductivity",
+  "description": "A life productivity tracker with Pokemon-style gamification, tracking work, health, habits, and dopamine.",
+  "requestFramePermissions": []
+}
