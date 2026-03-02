@@ -349,6 +349,231 @@ const PokemonAppear = ({ children, delay = 0 }: { children: React.ReactNode, del
   </motion.div>
 );
 
+// Khan Academy-style animations
+const ParticleExplosion = ({ color = "#10b981" }: { color?: string }) => {
+  const particles = Array.from({ length: 12 }, (_, i) => i);
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {particles.map((i) => (
+        <motion.div
+          key={i}
+          initial={{ 
+            x: 0, 
+            y: 0, 
+            scale: 1,
+            opacity: 1 
+          }}
+          animate={{ 
+            x: Math.cos((i / particles.length) * Math.PI * 2) * 80,
+            y: Math.sin((i / particles.length) * Math.PI * 2) * 80,
+            scale: 0,
+            opacity: 0
+          }}
+          transition={{ 
+            duration: 0.8,
+            ease: "easeOut"
+          }}
+          className="absolute top-1/2 left-1/2"
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: color
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const CheckmarkAnimation = ({ size = 60, color = "#10b981" }: { size?: number, color?: string }) => (
+  <motion.svg
+    width={size}
+    height={size}
+    viewBox="0 0 60 60"
+    initial={{ scale: 0, rotate: -90 }}
+    animate={{ scale: 1, rotate: 0 }}
+    transition={{
+      type: "spring",
+      stiffness: 200,
+      damping: 15
+    }}
+  >
+    <motion.circle
+      cx="30"
+      cy="30"
+      r="28"
+      fill="none"
+      stroke={color}
+      strokeWidth="4"
+      initial={{ pathLength: 0 }}
+      animate={{ pathLength: 1 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+    />
+    <motion.path
+      d="M15 30 L25 40 L45 20"
+      fill="none"
+      stroke={color}
+      strokeWidth="4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      initial={{ pathLength: 0 }}
+      animate={{ pathLength: 1 }}
+      transition={{ duration: 0.4, delay: 0.3, ease: "easeInOut" }}
+    />
+  </motion.svg>
+);
+
+const ProgressRing = ({ progress, size = 120, strokeWidth = 8 }: { progress: number, size?: number, strokeWidth?: number }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (progress / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      {/* Background circle */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#e5e7eb"
+        strokeWidth={strokeWidth}
+      />
+      {/* Progress circle */}
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="url(#progressGradient)"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1, ease: "easeInOut" }}
+        style={{
+          strokeDasharray: circumference
+        }}
+      />
+      <defs>
+        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
+
+const PulseRing = ({ delay = 0 }: { delay?: number }) => (
+  <motion.div
+    initial={{ scale: 0.8, opacity: 0 }}
+    animate={{ 
+      scale: [0.8, 1.2, 1.4],
+      opacity: [0, 0.5, 0]
+    }}
+    transition={{ 
+      duration: 1,
+      delay,
+      ease: "easeOut"
+    }}
+    className="absolute inset-0 rounded-full border-4 border-green-400"
+  />
+);
+
+const SuccessAnimation = () => (
+  <div className="relative w-20 h-20">
+    <PulseRing />
+    <PulseRing delay={0.2} />
+    <div className="absolute inset-0 flex items-center justify-center">
+      <CheckmarkAnimation size={60} />
+    </div>
+    <ParticleExplosion color="#10b981" />
+  </div>
+);
+
+const NumberCounter = ({ value, duration = 1 }: { value: number, duration?: number }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTime: number;
+    let animationFrame: number;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+      
+      setCount(Math.floor(progress * value));
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [value, duration]);
+
+  return <span>{count}</span>;
+};
+
+const XPGainAnimation = ({ amount, onComplete }: { amount: number, onComplete?: () => void }) => {
+  useEffect(() => {
+    if (onComplete) {
+      const timer = setTimeout(onComplete, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      initial={{ scale: 0, y: 0, opacity: 0 }}
+      animate={{ 
+        scale: [0, 1.2, 1],
+        y: [0, -20, -40],
+        opacity: [0, 1, 1, 0]
+      }}
+      transition={{ 
+        duration: 2,
+        times: [0, 0.3, 0.7, 1],
+        ease: "easeOut"
+      }}
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
+    >
+      <div className="relative">
+        <ParticleExplosion color="#f59e0b" />
+        <div className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-8 py-4 rounded-2xl shadow-2xl border-4 border-white">
+          <div className="text-sm font-black uppercase tracking-widest opacity-80">XP Gained</div>
+          <div className="text-4xl font-black">
+            +<NumberCounter value={amount} duration={0.8} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
+  useEffect(() => {
+    if (onComplete) {
+      const timer = setTimeout(onComplete, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0, opacity: 0 }}
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
+    >
+      <SuccessAnimation />
+    </motion.div>
+  );
+};
+
 // --- Utils ---
 
 const getTodayISO = () => {
@@ -452,6 +677,8 @@ export default function App() {
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(getSyncSettings);
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [newMilestone, setNewMilestone] = useState<{ milestone: Milestone; pokemon: CaughtPokemon } | null>(null);
+  const [showXPGain, setShowXPGain] = useState<number | null>(null);
+  const [showTaskComplete, setShowTaskComplete] = useState(false);
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -683,6 +910,7 @@ export default function App() {
     });
     
     if (xpDiff > 0) {
+      setShowXPGain(xpDiff);
       updateTotalXP(xpDiff);
       
       // Only apply boss damage if the log is for the current week
@@ -1133,9 +1361,11 @@ export default function App() {
                 onToggleTask={(taskId) => {
                   const task = tasks.find(t => t.id === taskId);
                   if (task && !task.completed) {
+                    setShowTaskComplete(true);
                     setTasks(prev => prev.map(t => 
                       t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
                     ));
+                    setShowXPGain(task.xpReward);
                     updateTotalXP(task.xpReward);
                     if (Math.random() < 0.02) {
                       rollDrop();
@@ -1235,6 +1465,7 @@ export default function App() {
                 onToggleTask={(taskId) => {
                   const task = tasks.find(t => t.id === taskId);
                   if (task && !task.completed) {
+                    setShowTaskComplete(true);
                     // Mark as completed
                     setTasks(prev => {
                       const newTasks = prev.map(t => 
@@ -1252,6 +1483,7 @@ export default function App() {
                       return newTasks;
                     });
                     // Award XP
+                    setShowXPGain(task.xpReward);
                     updateTotalXP(task.xpReward);
                     // 2% chance of Pokemon drop
                     if (Math.random() < 0.02) {
@@ -1405,6 +1637,25 @@ export default function App() {
             milestone={newMilestone.milestone}
             pokemon={newMilestone.pokemon}
             onClose={() => setNewMilestone(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* XP Gain Animation */}
+      <AnimatePresence>
+        {showXPGain !== null && (
+          <XPGainAnimation 
+            amount={showXPGain}
+            onComplete={() => setShowXPGain(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Task Complete Animation */}
+      <AnimatePresence>
+        {showTaskComplete && (
+          <TaskCompleteAnimation 
+            onComplete={() => setShowTaskComplete(false)}
           />
         )}
       </AnimatePresence>
@@ -1957,17 +2208,39 @@ function HomeTab({
               {todaysTasks.slice(0, 4).map(task => (
                 <motion.div
                   key={task.id}
-                  whileHover={{ scale: 1.02 }}
-                  className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer"
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer relative overflow-hidden"
                   onClick={() => onToggleTask(task.id)}
                 >
-                  <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 ${
-                    task.completed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'
-                  }`}>
-                    {task.completed && <CheckCircle2 className="text-white" size={14} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{task.title}</p>
+                  {task.completed && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute inset-0 bg-emerald-50"
+                    />
+                  )}
+                  <motion.div 
+                    className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 relative z-10 ${
+                      task.completed ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'
+                    }`}
+                    animate={task.completed ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AnimatePresence>
+                      {task.completed && (
+                        <motion.div
+                          initial={{ scale: 0, rotate: -90 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0 }}
+                        >
+                          <CheckCircle2 className="text-white" size={14} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                  <div className="flex-1 min-w-0 relative z-10">
+                    <p className={`text-xs font-bold truncate ${task.completed ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{task.title}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                         task.category === 'business' ? 'bg-red-100 text-red-700' :
@@ -2471,13 +2744,26 @@ function TodayTab({
           </section>
         </div>
 
-        <button 
+        <motion.button 
           onClick={handleSave}
-          className="w-full mt-8 py-4 bg-[#F97316] text-white rounded-2xl font-bold text-lg shadow-lg shadow-orange-200 hover:bg-[#EA580C] transition-all flex items-center justify-center gap-2"
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full mt-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-orange-200 hover:shadow-xl hover:shadow-orange-300 transition-all flex items-center justify-center gap-2 relative overflow-hidden group"
         >
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400 opacity-0 group-hover:opacity-20 transition-opacity"
+            animate={{
+              x: ['-100%', '100%']
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
           <CheckCircle2 size={20} />
           Save & Sync XP
-        </button>
+        </motion.button>
       </div>
 
       {metrics && (
