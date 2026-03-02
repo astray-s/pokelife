@@ -19,9 +19,7 @@ import {
   Home,
   TrendingUp,
   Target,
-  Calendar,
-  Volume2,
-  VolumeX
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -58,7 +56,6 @@ import {
   DEFAULT_TRAINER_BOOSTS,
   DEFAULT_STATUS_EFFECTS
 } from './constants';
-import { soundManager } from './sounds';
 import { exportHabitsToCSV, exportTasksToCSV } from './exportToSheets';
 import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './googleSheetsSync';
 
@@ -213,6 +210,144 @@ const Sparkle = ({ delay = 0 }: { delay?: number }) => (
   </motion.div>
 );
 
+// New Pokemon-themed animations
+const XPBurst = ({ amount }: { amount: number }) => (
+  <motion.div
+    initial={{ scale: 0, y: 0, opacity: 1 }}
+    animate={{ 
+      scale: [0, 1.2, 1],
+      y: [-30, -60],
+      opacity: [1, 1, 0]
+    }}
+    transition={{ duration: 1.5, ease: "easeOut" }}
+    className="absolute text-orange-500 font-black text-xl pointer-events-none z-50"
+  >
+    +{amount} XP
+  </motion.div>
+);
+
+const PokeballCatch = () => (
+  <motion.div
+    initial={{ scale: 1, rotate: 0 }}
+    animate={{ 
+      scale: [1, 0.8, 1.1, 0.9, 1],
+      rotate: [0, -15, 15, -10, 10, 0]
+    }}
+    transition={{ 
+      duration: 0.6,
+      times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+      ease: "easeInOut"
+    }}
+  >
+    <PokeBallIcon size={48} className="text-red-500" />
+  </motion.div>
+);
+
+const LevelUpAnimation = () => (
+  <motion.div className="relative">
+    {[...Array(8)].map((_, i) => (
+      <motion.div
+        key={i}
+        initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
+        animate={{
+          scale: [0, 1, 0],
+          x: Math.cos((i / 8) * Math.PI * 2) * 100,
+          y: Math.sin((i / 8) * Math.PI * 2) * 100,
+          opacity: [1, 1, 0]
+        }}
+        transition={{ duration: 1, delay: i * 0.05 }}
+        className="absolute text-3xl"
+      >
+        ⭐
+      </motion.div>
+    ))}
+  </motion.div>
+);
+
+const ShinySparkle = () => (
+  <motion.div className="absolute inset-0 pointer-events-none">
+    {[...Array(6)].map((_, i) => (
+      <motion.div
+        key={i}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{
+          scale: [0, 1, 0],
+          opacity: [0, 1, 0],
+          x: [0, (i % 2 ? 20 : -20)],
+          y: [0, (i % 3 ? 20 : -20)]
+        }}
+        transition={{
+          duration: 1,
+          delay: i * 0.1,
+          repeat: Infinity,
+          repeatDelay: 2
+        }}
+        className="absolute top-1/2 left-1/2 text-yellow-300 text-2xl"
+        style={{
+          transform: `rotate(${i * 60}deg)`
+        }}
+      >
+        ✨
+      </motion.div>
+    ))}
+  </motion.div>
+);
+
+const BounceIn = ({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) => (
+  <motion.div
+    initial={{ scale: 0, y: -50 }}
+    animate={{ scale: 1, y: 0 }}
+    transition={{
+      type: "spring",
+      stiffness: 260,
+      damping: 20,
+      delay
+    }}
+  >
+    {children}
+  </motion.div>
+);
+
+const SlideInFromRight = ({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) => (
+  <motion.div
+    initial={{ x: 100, opacity: 0 }}
+    animate={{ x: 0, opacity: 1 }}
+    transition={{ duration: 0.5, delay }}
+  >
+    {children}
+  </motion.div>
+);
+
+const FloatingBadge = ({ children }: { children: React.ReactNode }) => (
+  <motion.div
+    animate={{
+      y: [-5, 5, -5],
+    }}
+    transition={{
+      duration: 3,
+      repeat: Infinity,
+      ease: "easeInOut"
+    }}
+  >
+    {children}
+  </motion.div>
+);
+
+const PokemonAppear = ({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) => (
+  <motion.div
+    initial={{ scale: 0, rotate: -180, opacity: 0 }}
+    animate={{ scale: 1, rotate: 0, opacity: 1 }}
+    transition={{
+      type: "spring",
+      stiffness: 200,
+      damping: 15,
+      delay
+    }}
+  >
+    {children}
+  </motion.div>
+);
+
 // --- Utils ---
 
 const getTodayISO = () => {
@@ -313,7 +448,6 @@ const getXPForLevel = (level: number) => level * level * 150;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history'>('home');
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(getSyncSettings);
   const [syncStatus, setSyncStatus] = useState<string>('');
   
@@ -514,7 +648,6 @@ export default function App() {
     });
     
     if (xpDiff > 0) {
-      soundManager.play('xpGain'); // Sound effect!
       updateTotalXP(xpDiff);
       
       // Only apply boss damage if the log is for the current week
@@ -542,7 +675,6 @@ export default function App() {
       
       let newMonsters = [...prev.monstersOwned];
       if (newLevel > prev.level) {
-        soundManager.play('levelUp'); // Level up sound!
         // Unlock specific pokemon based on level
         const rarity = newLevel >= 21 ? 'legendary' : 
                         newLevel >= 13 ? 'epic' : 
@@ -557,7 +689,6 @@ export default function App() {
           isShiny
         };
         newMonsters.push(newPokemon);
-        if (isShiny) soundManager.play('shiny'); // Shiny sound!
         setShowLevelUp({ level: newLevel, pokemon: newPokemon });
       }
 
@@ -586,17 +717,12 @@ export default function App() {
       damage += damage * 0.5; // 50% bonus for weakness
     }
 
-    if (damage > 0) {
-      soundManager.play('bossDamage'); // Boss damage sound!
-    }
-
     setWeeklyBoss(prev => {
       if (!prev) return null;
       const newHP = Math.max(0, prev.hpRemaining - damage);
       const justDefeated = newHP === 0 && !prev.defeated;
       
       if (justDefeated) {
-        soundManager.play('bossDefeat'); // Boss defeat sound!
         rollDrop(true); // Guaranteed rare+ drop
       }
 
@@ -623,7 +749,6 @@ export default function App() {
       } else {
         if (roll < 40) {
           // XP Candy
-          soundManager.play('xpGain'); // XP candy sound!
           updateTotalXP(50);
           setNewDrop({ item: 'XP Candy (+50 XP)' });
           setPlayerState(prev => ({ ...prev, questsSinceDrop: 0 }));
@@ -647,9 +772,6 @@ export default function App() {
         isShiny
       };
 
-      soundManager.play('pokemonCatch'); // Pokemon catch sound!
-      if (isShiny) soundManager.play('shiny'); // Shiny sound!
-      
       setPlayerState(prev => ({
         ...prev,
         monstersOwned: [caught, ...prev.monstersOwned],
@@ -673,7 +795,6 @@ export default function App() {
     // Simplified: just check if it's completed based on current state
     if (!isQuestCompleted(quest)) return;
 
-    soundManager.play('questComplete'); // Quest complete sound!
     updateTotalXP(quest.baseXPReward);
     setQuests(prev => prev.map(q => q.id === questId ? { ...q, status: 'claimed' } : q));
     rollDrop();
@@ -1303,6 +1424,7 @@ function Modal({
 function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: CaughtPokemon, onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
+      <LevelUpAnimation />
       <motion.div 
         initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
         animate={{ scale: 1, opacity: 1, rotate: 0 }}
@@ -1310,6 +1432,7 @@ function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: Cau
         className="bg-white rounded-[3rem] shadow-2xl overflow-hidden max-w-sm w-full relative border-8 border-yellow-400"
       >
         <div className="absolute inset-0 bg-gradient-to-b from-yellow-50 to-transparent pointer-events-none" />
+        <ConfettiExplosion />
         <div className="p-10 text-center space-y-6 relative z-10">
           <div className="relative">
             <motion.div 
@@ -1319,19 +1442,22 @@ function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: Cau
             >
               <Plus size={160} />
             </motion.div>
-            <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white bg-gradient-to-br ${
-              pokemon.isShiny ? 'from-yellow-100 to-orange-200' :
-              pokemon.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
-              pokemon.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
-              'from-slate-100 to-slate-200'
-            }`}>
-              <img 
-                src={pokemon.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon.imageUrl} 
-                alt={pokemon.name} 
-                className="w-24 h-24 object-contain"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            <BounceIn delay={0.2}>
+              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white bg-gradient-to-br ${
+                pokemon.isShiny ? 'from-yellow-100 to-orange-200' :
+                pokemon.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
+                pokemon.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
+                'from-slate-100 to-slate-200'
+              }`}>
+                {pokemon.isShiny && <ShinySparkle />}
+                <img 
+                  src={pokemon.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon.imageUrl} 
+                  alt={pokemon.name} 
+                  className="w-24 h-24 object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </BounceIn>
           </div>
 
           <div className="space-y-1">
@@ -1405,26 +1531,7 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
         <div className="p-10 text-center space-y-6">
           {isCatching && drop.pokemon && (
             <div className="py-12 flex flex-col items-center gap-8">
-              <motion.div
-                animate={{ 
-                  rotate: [0, -15, 15, -15, 15, 0],
-                  x: [0, -5, 5, -5, 5, 0]
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: 1,
-                  ease: "easeInOut"
-                }}
-                className="relative w-24 h-24"
-              >
-                {/* Pokeball CSS */}
-                <div className="w-24 h-24 rounded-full border-4 border-slate-900 bg-white relative overflow-hidden animate-pulse">
-                  <div className="absolute top-0 left-0 w-full h-1/2 bg-red-500 border-b-4 border-slate-900" />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-slate-900 bg-white z-10 flex items-center justify-center">
-                    <div className="w-3 h-3 rounded-full bg-slate-200 animate-ping" />
-                  </div>
-                </div>
-              </motion.div>
+              <PokeballCatch />
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1443,29 +1550,24 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
             >
               {drop.pokemon ? (
                 <>
-                  <div className={`w-40 h-40 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br relative ${
-                    pokemon?.isShiny ? 'from-yellow-100 to-orange-200' :
-                    pokemon?.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
-                    pokemon?.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
-                    pokemon?.rarity === 'rare' ? 'from-blue-100 to-cyan-200' :
-                    'from-slate-100 to-slate-200'
-                  }`}>
-                    {pokemon?.isShiny && (
-                      <motion.div 
-                        animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 180, 270, 360] }}
-                        transition={{ duration: 4, repeat: Infinity }}
-                        className="absolute inset-0 text-yellow-400 opacity-30"
-                      >
-                        <Trophy size={160} />
-                      </motion.div>
-                    )}
-                    <img 
-                      src={pokemon?.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon?.imageUrl} 
-                      alt={pokemon?.name} 
-                      className="w-32 h-32 object-contain relative z-10"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
+                  <ConfettiExplosion />
+                  <BounceIn>
+                    <div className={`w-40 h-40 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br relative ${
+                      pokemon?.isShiny ? 'from-yellow-100 to-orange-200' :
+                      pokemon?.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
+                      pokemon?.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
+                      pokemon?.rarity === 'rare' ? 'from-blue-100 to-cyan-200' :
+                      'from-slate-100 to-slate-200'
+                    }`}>
+                      {pokemon?.isShiny && <ShinySparkle />}
+                      <img 
+                        src={pokemon?.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon?.imageUrl} 
+                        alt={pokemon?.name} 
+                        className="w-32 h-32 object-contain relative z-10"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </BounceIn>
                   <div className="space-y-2">
                     <div className="flex items-center justify-center gap-2">
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${
@@ -2807,41 +2909,53 @@ function PokemonTab({ monsters }: { monsters: CaughtPokemon[] }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {monsters.map((m) => (
-            <motion.div 
-              key={m.instanceId}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSelected(m)}
-              className={`bg-white p-4 rounded-3xl shadow-sm border cursor-pointer relative overflow-hidden group ${
-                m.isShiny ? 'border-yellow-400 bg-yellow-50/30' : 'border-slate-100'
-              }`}
-            >
-              {m.isShiny && (
-                <div className="absolute top-2 right-2 text-yellow-500 animate-pulse">
-                  <Trophy size={14} />
+          {monsters.map((m, index) => (
+            <div key={m.instanceId}>
+              <PokemonAppear delay={index * 0.05}>
+                <motion.div 
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelected(m)}
+                  className={`bg-white p-4 rounded-3xl shadow-sm border cursor-pointer relative overflow-hidden group ${
+                    m.isShiny ? 'border-yellow-400 bg-yellow-50/30' : 'border-slate-100'
+                  }`}
+                >
+                {m.isShiny && (
+                  <>
+                    <ShinySparkle />
+                    <FloatingBadge>
+                      <div className="absolute top-2 right-2 text-yellow-500">
+                        <Trophy size={14} />
+                      </div>
+                    </FloatingBadge>
+                  </>
+                )}
+                <motion.div 
+                  className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-slate-100 transition-colors"
+                  whileHover={{ rotate: [0, -5, 5, -5, 0] }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <img 
+                    src={m.isShiny ? m.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : m.imageUrl} 
+                    alt={m.name} 
+                    className="w-20 h-20 object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+                <div className="text-center">
+                  <div className="font-bold text-sm truncate">{m.isShiny ? `Shiny ${m.name}` : m.name}</div>
+                  <div className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${
+                    m.rarity === 'legendary' ? 'text-orange-600' :
+                    m.rarity === 'epic' ? 'text-purple-600' :
+                    m.rarity === 'rare' ? 'text-blue-600' :
+                    'text-slate-400'
+                  }`}>
+                    {m.rarity}
+                  </div>
                 </div>
-              )}
-              <div className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-slate-100 transition-colors">
-                <img 
-                  src={m.isShiny ? m.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : m.imageUrl} 
-                  alt={m.name} 
-                  className="w-20 h-20 object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="text-center">
-                <div className="font-bold text-sm truncate">{m.isShiny ? `Shiny ${m.name}` : m.name}</div>
-                <div className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${
-                  m.rarity === 'legendary' ? 'text-orange-600' :
-                  m.rarity === 'epic' ? 'text-purple-600' :
-                  m.rarity === 'rare' ? 'text-blue-600' :
-                  'text-slate-400'
-                }`}>
-                  {m.rarity}
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </PokemonAppear>
+            </div>
           ))}
         </div>
       )}
