@@ -59,6 +59,7 @@ import {
 import { exportHabitsToCSV, exportTasksToCSV } from './exportToSheets';
 import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './googleSheetsSync';
 import { checkMilestones, MILESTONES, Milestone } from './milestones';
+import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -679,6 +680,9 @@ export default function App() {
   const [newMilestone, setNewMilestone] = useState<{ milestone: Milestone; pokemon: CaughtPokemon } | null>(null);
   const [showXPGain, setShowXPGain] = useState<number | null>(null);
   const [showTaskComplete, setShowTaskComplete] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCardBlob, setShareCardBlob] = useState<Blob | null>(null);
+  const [shareCardStats, setShareCardStats] = useState<WeeklyStats | null>(null);
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -1126,6 +1130,21 @@ export default function App() {
     }));
 
     setQuests(prev => [...prev.filter(q => q.type !== 'daily'), ...newDailies]);
+  };
+
+  const handleShareProgress = async () => {
+    const stats = generateWeeklyStats(
+      dailyMetrics,
+      playerState.level,
+      playerState.monstersOwned,
+      quests
+    );
+    
+    setShareCardStats(stats);
+    
+    const blob = await generateShareableCard(stats);
+    setShareCardBlob(blob);
+    setShowShareModal(true);
   };
 
   const isQuestCompleted = (quest: Quest) => {
@@ -1659,6 +1678,38 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Floating Share Button */}
+      <motion.button
+        onClick={handleShareProgress}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full shadow-2xl flex items-center justify-center z-40 hover:shadow-purple-300"
+        title="Share Weekly Progress"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+      </motion.button>
+
+      {/* Share Modal */}
+      <AnimatePresence>
+        {showShareModal && shareCardBlob && shareCardStats && (
+          <ShareProgressModal
+            blob={shareCardBlob}
+            stats={shareCardStats}
+            onClose={() => {
+              setShowShareModal(false);
+              setShareCardBlob(null);
+              setShareCardStats(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2026,6 +2077,129 @@ function MilestonePopup({ milestone, pokemon, onClose }: { milestone: Milestone,
           >
             Amazing!
           </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ShareProgressModal({ blob, stats, onClose }: { blob: Blob, stats: WeeklyStats, onClose: () => void }) {
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(blob);
+    setImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [blob]);
+
+  const handleDownload = () => {
+    downloadCard(blob);
+  };
+
+  const handleCopy = async () => {
+    const success = await copyCardToClipboard(blob);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full relative"
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-all z-10"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="p-8">
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-black text-slate-800 mb-2">📊 Share Your Progress</h2>
+            <p className="text-slate-600">Show your accountability buddy or community what you've achieved this week!</p>
+          </div>
+
+          {/* Preview */}
+          <div className="bg-slate-50 rounded-2xl p-4 mb-6">
+            <img 
+              src={imageUrl} 
+              alt="Weekly Progress Card" 
+              className="w-full rounded-xl shadow-lg"
+            />
+          </div>
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 p-4 rounded-xl border border-orange-100">
+              <div className="text-2xl font-black text-orange-600">{stats.totalHours.toFixed(1)}</div>
+              <div className="text-xs font-bold text-orange-700 uppercase tracking-wider">Hours</div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
+              <div className="text-2xl font-black text-blue-600">{stats.totalXP}</div>
+              <div className="text-xs font-bold text-blue-700 uppercase tracking-wider">XP Earned</div>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100">
+              <div className="text-2xl font-black text-purple-600">{stats.completedQuests}</div>
+              <div className="text-xs font-bold text-purple-700 uppercase tracking-wider">Quests</div>
+            </div>
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
+              <div className="text-2xl font-black text-green-600">{stats.pokemonCaught.length}</div>
+              <div className="text-xs font-bold text-green-700 uppercase tracking-wider">Pokémon</div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <motion.button
+              onClick={handleDownload}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-sm hover:from-blue-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2 shadow-lg"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Image
+            </motion.button>
+            <motion.button
+              onClick={handleCopy}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg ${
+                copied 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+              }`}
+            >
+              {copied ? (
+                <>
+                  <CheckCircle2 size={20} />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy to Clipboard
+                </>
+              )}
+            </motion.button>
+          </div>
+
+          <p className="text-xs text-slate-500 text-center mt-4">
+            💡 Tip: Paste directly into Discord, Slack, or Skool to share with your community!
+          </p>
         </div>
       </motion.div>
     </div>
