@@ -2991,6 +2991,7 @@ function HistoryTab({ metrics, tasks, onDelete, onReset, onEditDate }: {
       dailyMetrics: localStorage.getItem('synthPoke_dailyMetrics'),
       quests: localStorage.getItem('synthPoke_quests'),
       weeklyBoss: localStorage.getItem('synthPoke_weeklyBoss'),
+      tasks: localStorage.getItem('synthPoke_tasks'),
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3011,6 +3012,7 @@ function HistoryTab({ metrics, tasks, onDelete, onReset, onEditDate }: {
         if (data.dailyMetrics) localStorage.setItem('synthPoke_dailyMetrics', data.dailyMetrics);
         if (data.quests) localStorage.setItem('synthPoke_quests', data.quests);
         if (data.weeklyBoss) localStorage.setItem('synthPoke_weeklyBoss', data.weeklyBoss);
+        if (data.tasks) localStorage.setItem('synthPoke_tasks', data.tasks);
         window.location.reload();
       } catch (err) {
         alert('Failed to import data. Invalid file format.');
