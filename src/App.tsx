@@ -58,6 +58,7 @@ import {
 } from './constants';
 import { exportHabitsToCSV, exportTasksToCSV } from './exportToSheets';
 import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './googleSheetsSync';
+import { checkMilestones, MILESTONES, Milestone } from './milestones';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -450,6 +451,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history'>('home');
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(getSyncSettings);
   const [syncStatus, setSyncStatus] = useState<string>('');
+  const [newMilestone, setNewMilestone] = useState<{ milestone: Milestone; pokemon: CaughtPokemon } | null>(null);
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -460,6 +462,7 @@ export default function App() {
       questsSinceDrop: 0,
       lastDailyReset: '',
       lastWeeklyReset: '',
+      unlockedMilestones: [],
       customHabits: {
         business: DEFAULT_BUSINESS_HABITS,
         health: DEFAULT_HEALTH_HABITS,
@@ -481,7 +484,8 @@ export default function App() {
         ...defaultState,
         ...parsed,
         customHabits: parsed.customHabits || defaultState.customHabits,
-        categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility
+        categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility,
+        unlockedMilestones: parsed.unlockedMilestones || []
       };
     }
     
@@ -633,6 +637,37 @@ export default function App() {
 
     setDailyMetrics(prev => {
       const newMetrics = { ...prev, [targetDate]: updatedMetrics };
+      
+      // Check for milestone unlocks
+      const unlockedMilestones = playerState.unlockedMilestones || [];
+      const newlyUnlocked = checkMilestones(newMetrics, unlockedMilestones);
+      
+      if (newlyUnlocked.length > 0) {
+        // Unlock the first new milestone
+        const milestone = newlyUnlocked[0];
+        const isShiny = Math.random() < 0.05; // 5% chance for shiny milestone reward
+        const pokemon: CaughtPokemon = {
+          ...milestone.reward.pokemon,
+          instanceId: Math.random().toString(36).substr(2, 9),
+          caughtAt: new Date().toISOString(),
+          isShiny
+        };
+        
+        setPlayerState(prev => ({
+          ...prev,
+          monstersOwned: [pokemon, ...prev.monstersOwned],
+          unlockedMilestones: [
+            ...(prev.unlockedMilestones || []),
+            {
+              milestoneId: milestone.id,
+              unlockedAt: new Date().toISOString(),
+              pokemon
+            }
+          ]
+        }));
+        
+        setNewMilestone({ milestone, pokemon });
+      }
       
       // Auto-sync if enabled
       if (syncSettings.autoSync && syncSettings.sheetUrl) {
@@ -1362,6 +1397,17 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Milestone Unlock Popup */}
+      <AnimatePresence>
+        {newMilestone && (
+          <MilestonePopup 
+            milestone={newMilestone.milestone}
+            pokemon={newMilestone.pokemon}
+            onClose={() => setNewMilestone(null)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1606,6 +1652,129 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
               </button>
             </motion.div>
           )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function MilestonePopup({ milestone, pokemon, onClose }: { milestone: Milestone, pokemon: CaughtPokemon, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
+      <LevelUpAnimation />
+      <ConfettiExplosion />
+      <motion.div 
+        initial={{ scale: 0.5, opacity: 0, y: 50 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.5, opacity: 0, y: 50 }}
+        className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-[3rem] shadow-2xl overflow-hidden max-w-md w-full relative border-8 border-purple-400"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-white/50 to-transparent pointer-events-none" />
+        
+        <div className="p-10 text-center space-y-6 relative z-10">
+          {/* Badge */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", delay: 0.2 }}
+            className="relative"
+          >
+            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-white">
+              <span className="text-5xl">{milestone.badge}</span>
+            </div>
+            <FloatingBadge>
+              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black px-2 py-1 rounded-full">
+                SECRET!
+              </div>
+            </FloatingBadge>
+          </motion.div>
+
+          {/* Title */}
+          <div className="space-y-2">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-xs font-black text-purple-600 uppercase tracking-[0.3em]"
+            >
+              🎉 Hidden Milestone Unlocked!
+            </motion.div>
+            <motion.h2 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-3xl font-black tracking-tight text-slate-800"
+            >
+              {milestone.name}
+            </motion.h2>
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-sm text-slate-600 font-medium"
+            >
+              {milestone.description}
+            </motion.p>
+          </div>
+
+          {/* Pokemon Reward */}
+          <BounceIn delay={0.6}>
+            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border-2 border-purple-200">
+              <div className="text-xs font-black text-purple-600 uppercase tracking-widest mb-3">
+                Reward
+              </div>
+              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br relative ${
+                pokemon.isShiny ? 'from-yellow-100 to-orange-200' :
+                pokemon.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
+                pokemon.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
+                'from-blue-100 to-cyan-200'
+              }`}>
+                {pokemon.isShiny && <ShinySparkle />}
+                <img 
+                  src={pokemon.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon.imageUrl} 
+                  alt={pokemon.name} 
+                  className="w-24 h-24 object-contain relative z-10"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="mt-4">
+                <div className="font-black text-lg text-slate-800">
+                  {pokemon.isShiny ? `Shiny ${pokemon.name}` : pokemon.name}
+                </div>
+                <div className={`text-xs font-bold uppercase tracking-widest mt-1 ${
+                  pokemon.rarity === 'legendary' ? 'text-orange-600' :
+                  pokemon.rarity === 'epic' ? 'text-purple-600' :
+                  'text-blue-600'
+                }`}>
+                  {pokemon.rarity} {pokemon.isShiny ? '✨ Shiny' : ''}
+                </div>
+              </div>
+            </div>
+          </BounceIn>
+
+          {/* Message */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="bg-purple-100 p-4 rounded-xl"
+          >
+            <p className="text-sm text-purple-900 font-medium italic">
+              "{milestone.reward.message}"
+            </p>
+          </motion.div>
+
+          <motion.button 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            onClick={onClose}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-black text-lg uppercase tracking-[0.2em] hover:from-purple-600 hover:to-pink-600 transition-all shadow-xl shadow-purple-200"
+          >
+            Amazing!
+          </motion.button>
         </div>
       </motion.div>
     </div>

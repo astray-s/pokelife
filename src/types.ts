@@ -89,6 +89,13 @@ export interface PlayerState {
   lastWeeklyReset: string;
   customHabits?: CustomHabits;
   categoryVisibility?: CategoryVisibility;
+  unlockedMilestones?: UnlockedMilestone[];
+}
+
+export interface UnlockedMilestone {
+  milestoneId: string;
+  unlockedAt: string;
+  pokemon: CaughtPokemon;
 }
 
 export interface CustomHabits {
