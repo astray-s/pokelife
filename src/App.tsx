@@ -784,6 +784,10 @@ export default function App() {
   const [hatchedPokemon, setHatchedPokemon] = useState<CaughtPokemon | null>(null);
   const [showHabitManager, setShowHabitManager] = useState(false);
   const [editingHabit, setEditingHabit] = useState<{ category: keyof CustomHabits; habit: HabitDefinition } | null>(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('synthPoke_darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // --- Persistence ---
   const isResettingRef = React.useRef(false);
@@ -812,6 +816,10 @@ export default function App() {
     if (isResettingRef.current) return;
     localStorage.setItem('synthPoke_bosses', JSON.stringify(bosses));
   }, [bosses]);
+
+  useEffect(() => {
+    localStorage.setItem('synthPoke_darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
 
   useEffect(() => {
     if (isResettingRef.current) return;
@@ -1475,20 +1483,34 @@ export default function App() {
   const progress = Math.min(1, xpIntoLevel / xpRequiredForNext);
 
   return (
-    <div className="min-h-screen bg-[#FDFCF0] text-[#4A4A4A] font-sans pb-24">
+    <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${
+      darkMode 
+        ? 'bg-slate-900 text-slate-100' 
+        : 'bg-[#FDFCF0] text-[#4A4A4A]'
+    }`}>
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E4D8] px-4 py-4">
+      <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 ${
+        darkMode
+          ? 'bg-slate-800/90 border-slate-700'
+          : 'bg-white/90 border-[#E8E4D8]'
+      }`}>
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.div 
               whileHover={{ rotate: 20 }}
-              className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center shadow-inner border border-red-100 relative overflow-hidden"
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner border relative overflow-hidden ${
+                darkMode
+                  ? 'bg-red-900/30 border-red-800'
+                  : 'bg-red-50 border-red-100'
+              }`}
             >
               <PokeBallIcon className="text-red-500" size={28} />
               <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent pointer-events-none" />
             </motion.div>
             <div>
-              <h1 className="font-black text-xl tracking-tight text-slate-800 flex items-center gap-2">
+              <h1 className={`font-black text-xl tracking-tight flex items-center gap-2 ${
+                darkMode ? 'text-slate-100' : 'text-slate-800'
+              }`}>
                 PokeLife
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold uppercase tracking-tighter">v2.0</span>
               </h1>
@@ -1612,6 +1634,19 @@ export default function App() {
               <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45 border-l border-t border-slate-800" />
             </div>
           </div>
+          
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`ml-4 w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-110 ${
+              darkMode
+                ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                : 'bg-slate-800/10 text-slate-600 hover:bg-slate-800/20'
+            }`}
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
@@ -1878,7 +1913,11 @@ export default function App() {
       </AnimatePresence>
 
       {/* Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-[#E8E4D8] px-2 py-2 z-40">
+      <nav className={`fixed bottom-0 left-0 right-0 backdrop-blur-lg border-t px-2 py-2 z-40 transition-colors duration-300 ${
+        darkMode
+          ? 'bg-slate-800/90 border-slate-700'
+          : 'bg-white/90 border-[#E8E4D8]'
+      }`}>
         <div className="max-w-2xl mx-auto flex justify-around items-center">
           <TabButton 
             active={activeTab === 'home'} 
