@@ -2087,7 +2087,7 @@ function Modal({
   );
 }
 
-function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: CaughtPokemon, onClose: () => void }) {
+function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: CaughtPokemon | null, onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
       <LevelUpAnimation />
@@ -2109,19 +2109,8 @@ function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: Cau
               <Plus size={160} />
             </motion.div>
             <BounceIn delay={0.2}>
-              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white bg-gradient-to-br ${
-                pokemon.isShiny ? 'from-yellow-100 to-orange-200' :
-                pokemon.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
-                pokemon.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
-                'from-slate-100 to-slate-200'
-              }`}>
-                {pokemon.isShiny && <ShinySparkle />}
-                <img 
-                  src={pokemon.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon.imageUrl} 
-                  alt={pokemon.name} 
-                  className="w-24 h-24 object-contain"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="w-32 h-32 mx-auto rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white bg-gradient-to-br from-yellow-100 to-orange-200">
+                <div className="text-6xl">🎉</div>
               </div>
             </BounceIn>
           </div>
@@ -2144,7 +2133,7 @@ function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: Cau
               LEVEL UP!
             </motion.h2>
             <p className="text-sm font-medium text-slate-500">
-              You unlocked a <span className="text-slate-900 font-bold">{pokemon.isShiny ? 'Shiny ' : ''}{pokemon.name}</span>!
+              You've reached <span className="text-slate-900 font-bold">Level {level}</span>!
             </p>
           </div>
 
