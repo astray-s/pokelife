@@ -44,7 +44,9 @@ import {
   Rarity,
   Task,
   TaskCategory,
-  TASK_CATEGORY_XP
+  TASK_CATEGORY_XP,
+  CustomHabits,
+  HabitDefinition
 } from './types';
 import { 
   POKEMON_POOLS, 
@@ -780,6 +782,8 @@ export default function App() {
   const [newDrop, setNewDrop] = useState<{ pokemon?: Pokemon; item?: string; egg?: Egg; boss?: Boss } | null>(null);
   const [hatchingEgg, setHatchingEgg] = useState<Egg | null>(null);
   const [hatchedPokemon, setHatchedPokemon] = useState<CaughtPokemon | null>(null);
+  const [showHabitManager, setShowHabitManager] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<{ category: keyof CustomHabits; habit: HabitDefinition } | null>(null);
 
   // --- Persistence ---
   const isResettingRef = React.useRef(false);
@@ -1291,6 +1295,39 @@ export default function App() {
     setEntryToDelete(null);
   };
 
+  // Habit Management Functions
+  const addHabit = (category: keyof CustomHabits, habit: HabitDefinition) => {
+    setPlayerState(prev => ({
+      ...prev,
+      customHabits: {
+        ...prev.customHabits!,
+        [category]: [...(prev.customHabits?.[category] || []), habit]
+      }
+    }));
+  };
+
+  const updateHabit = (category: keyof CustomHabits, habitId: string, updates: Partial<HabitDefinition>) => {
+    setPlayerState(prev => ({
+      ...prev,
+      customHabits: {
+        ...prev.customHabits!,
+        [category]: prev.customHabits![category].map(h => 
+          h.id === habitId ? { ...h, ...updates } : h
+        )
+      }
+    }));
+  };
+
+  const deleteHabit = (category: keyof CustomHabits, habitId: string) => {
+    setPlayerState(prev => ({
+      ...prev,
+      customHabits: {
+        ...prev.customHabits!,
+        [category]: prev.customHabits![category].filter(h => h.id !== habitId)
+      }
+    }));
+  };
+
   const factoryReset = () => {
     // Stop all state persistence immediately
     isResettingRef.current = true;
@@ -1639,6 +1676,8 @@ export default function App() {
                 }}
                 dailyEggClaimed={playerState.lastDailyEggClaim === selectedDate}
                 canClaimDailyEgg={selectedDate === getTodayISO() && playerState.lastDailyEggClaim !== selectedDate}
+                customHabits={playerState.customHabits!}
+                onManageHabits={() => setShowHabitManager(true)}
               />
             </motion.div>
           )}
@@ -1973,6 +2012,19 @@ export default function App() {
               setShareCardBlob(null);
               setShareCardStats(null);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Habit Manager Modal */}
+      <AnimatePresence>
+        {showHabitManager && (
+          <HabitManagerModal
+            customHabits={playerState.customHabits!}
+            onClose={() => setShowHabitManager(false)}
+            onAddHabit={addHabit}
+            onUpdateHabit={updateHabit}
+            onDeleteHabit={deleteHabit}
           />
         )}
       </AnimatePresence>
@@ -3150,7 +3202,9 @@ function TodayTab({
   categoryVisibility,
   onToggleCategory,
   dailyEggClaimed,
-  canClaimDailyEgg
+  canClaimDailyEgg,
+  customHabits,
+  onManageHabits
 }: { 
   metrics?: DailyMetrics, 
   onSave: (m: any) => void,
@@ -3159,7 +3213,9 @@ function TodayTab({
   categoryVisibility: any,
   onToggleCategory: (category: string) => void,
   dailyEggClaimed: boolean,
-  canClaimDailyEgg: boolean
+  canClaimDailyEgg: boolean,
+  customHabits: CustomHabits,
+  onManageHabits: () => void
 }) {
   const [form, setForm] = useState({
     // Main Attacks (Business)
@@ -3331,7 +3387,15 @@ function TodayTab({
         </div>
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 relative z-10">
-          <h2 className="text-xl font-bold">Log Life Data</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold">Log Life Data</h2>
+            <button
+              onClick={onManageHabits}
+              className="text-xs font-bold text-purple-500 hover:text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+            >
+              ⚙️ Manage Habits
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date:</label>
             <div className="flex items-center gap-2">
@@ -4991,5 +5055,291 @@ function StatMini({ label, val }: { label: string, val: number }) {
       <span className="text-[9px] font-bold text-slate-400 uppercase">{label}</span>
       <span className="text-xs font-bold text-slate-700">{val}</span>
     </div>
+  );
+}
+
+
+function HabitManagerModal({ 
+  customHabits, 
+  onClose, 
+  onAddHabit, 
+  onUpdateHabit, 
+  onDeleteHabit 
+}: { 
+  customHabits: CustomHabits,
+  onClose: () => void,
+  onAddHabit: (category: keyof CustomHabits, habit: HabitDefinition) => void,
+  onUpdateHabit: (category: keyof CustomHabits, habitId: string, updates: Partial<HabitDefinition>) => void,
+  onDeleteHabit: (category: keyof CustomHabits, habitId: string) => void
+}) {
+  const [activeCategory, setActiveCategory] = useState<keyof CustomHabits>('business');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<HabitDefinition | null>(null);
+  const [formData, setFormData] = useState<Partial<HabitDefinition>>({
+    label: '',
+    type: 'number',
+    xpValue: 10,
+    step: '1'
+  });
+
+  const categories = [
+    { key: 'business' as const, label: 'Business', icon: '⚔️', color: 'red' },
+    { key: 'health' as const, label: 'Health', icon: '💪', color: 'pink' },
+    { key: 'trainerBoosts' as const, label: 'Boosts', icon: '⭐', color: 'yellow' },
+    { key: 'statusEffects' as const, label: 'Penalties', icon: '💀', color: 'purple' }
+  ];
+
+  const handleSubmit = () => {
+    if (!formData.label || !formData.xpValue) return;
+
+    const habit: HabitDefinition = {
+      id: editingHabit?.id || `custom_${Date.now()}`,
+      label: formData.label!,
+      type: formData.type || 'number',
+      xpValue: formData.xpValue!,
+      step: formData.step,
+      min: formData.min,
+      max: formData.max,
+      isNegative: activeCategory === 'statusEffects'
+    };
+
+    if (editingHabit) {
+      onUpdateHabit(activeCategory, editingHabit.id, habit);
+    } else {
+      onAddHabit(activeCategory, habit);
+    }
+
+    setShowAddForm(false);
+    setEditingHabit(null);
+    setFormData({ label: '', type: 'number', xpValue: 10, step: '1' });
+  };
+
+  const handleEdit = (habit: HabitDefinition) => {
+    setEditingHabit(habit);
+    setFormData({
+      label: habit.label,
+      type: habit.type,
+      xpValue: habit.xpValue,
+      step: habit.step,
+      min: habit.min,
+      max: habit.max
+    });
+    setShowAddForm(true);
+  };
+
+  const handleCancel = () => {
+    setShowAddForm(false);
+    setEditingHabit(null);
+    setFormData({ label: '', type: 'number', xpValue: 10, step: '1' });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-[2.5rem] shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden border-4 border-slate-100"
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-6 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+          >
+            <X className="text-white" size={20} />
+          </button>
+          <h2 className="text-2xl font-black text-white">Manage Habits</h2>
+          <p className="text-sm text-white/80 mt-1">Customize your daily tracking metrics</p>
+        </div>
+
+        {/* Category Tabs */}
+        <div className="flex gap-2 p-4 bg-slate-50 border-b border-slate-200 overflow-x-auto">
+          {categories.map(cat => (
+            <button
+              key={cat.key}
+              onClick={() => {
+                setActiveCategory(cat.key);
+                setShowAddForm(false);
+                handleCancel();
+              }}
+              className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all ${
+                activeCategory === cat.key
+                  ? `bg-${cat.color}-500 text-white shadow-lg`
+                  : 'bg-white text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {cat.icon} {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          {!showAddForm ? (
+            <div className="space-y-4">
+              {/* Add Button */}
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="w-full p-4 border-2 border-dashed border-slate-300 rounded-2xl hover:border-purple-400 hover:bg-purple-50 transition-all flex items-center justify-center gap-2 text-slate-600 hover:text-purple-600 font-bold"
+              >
+                <Plus size={20} />
+                Add New Habit
+              </button>
+
+              {/* Habit List */}
+              <div className="space-y-3">
+                {customHabits[activeCategory].map(habit => (
+                  <div
+                    key={habit.id}
+                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between group hover:border-purple-300 transition-all"
+                  >
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-800">{habit.label}</div>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                        <span className="bg-white px-2 py-1 rounded-lg border border-slate-200">
+                          {habit.type === 'number' ? '🔢 Number' : '✓ Checkbox'}
+                        </span>
+                        <span className={`font-bold ${habit.isNegative ? 'text-red-500' : 'text-green-500'}`}>
+                          {habit.isNegative ? '-' : '+'}{habit.xpValue} XP
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => handleEdit(habit)}
+                        className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete "${habit.label}"?`)) {
+                            onDeleteHabit(activeCategory, habit.id);
+                          }
+                        }}
+                        className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <h3 className="text-lg font-black text-slate-800">
+                {editingHabit ? 'Edit Habit' : 'Add New Habit'}
+              </h3>
+
+              {/* Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">Habit Name</label>
+                  <input
+                    type="text"
+                    value={formData.label}
+                    onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                    placeholder="e.g., Morning Meditation"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">Type</label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'number' | 'boolean' })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                  >
+                    <option value="number">Number (count/hours)</option>
+                    <option value="boolean">Checkbox (yes/no)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">
+                    XP Value {activeCategory === 'statusEffects' ? '(Penalty)' : '(Reward)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.xpValue}
+                    onChange={(e) => setFormData({ ...formData, xpValue: parseInt(e.target.value) || 0 })}
+                    min="1"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    {formData.type === 'number' 
+                      ? 'XP per unit (e.g., 20 XP per hour worked)'
+                      : 'Flat XP when checked'}
+                  </p>
+                </div>
+
+                {formData.type === 'number' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-2">Step Size</label>
+                      <input
+                        type="text"
+                        value={formData.step}
+                        onChange={(e) => setFormData({ ...formData, step: e.target.value })}
+                        placeholder="e.g., 0.5 or 1"
+                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-2">Min (optional)</label>
+                        <input
+                          type="number"
+                          value={formData.min ?? ''}
+                          onChange={(e) => setFormData({ ...formData, min: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-2">Max (optional)</label>
+                        <input
+                          type="number"
+                          value={formData.max ?? ''}
+                          onChange={(e) => setFormData({ ...formData, max: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!formData.label || !formData.xpValue}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editingHabit ? 'Update' : 'Add'} Habit
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
