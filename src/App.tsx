@@ -731,27 +731,29 @@ export default function App() {
       const parsed = JSON.parse(saved);
       
       // Migrate old Pokemon to have characteristics
-      const migratedMonsters = (parsed.monstersOwned || []).map((mon: any) => {
-        if (!mon.height || !mon.nature) {
-          // Old Pokemon without characteristics - add them
-          const characteristics = generatePokemonCharacteristics(
-            { id: mon.id, name: mon.name, rarity: mon.rarity, imageUrl: mon.imageUrl },
-            mon.isShiny || false
-          );
-          return {
-            ...mon,
-            ...characteristics
-          };
-        }
-        return mon;
-      });
+      const migratedMonsters = (parsed.monstersOwned || [])
+        .filter((mon: any) => mon != null) // Filter out null/undefined entries
+        .map((mon: any) => {
+          if (!mon.height || !mon.nature) {
+            // Old Pokemon without characteristics - add them
+            const characteristics = generatePokemonCharacteristics(
+              { id: mon.id, name: mon.name, rarity: mon.rarity, imageUrl: mon.imageUrl },
+              mon.isShiny || false
+            );
+            return {
+              ...mon,
+              ...characteristics
+            };
+          }
+          return mon;
+        });
       
       // Merge with defaults to ensure new properties exist
       return {
         ...defaultState,
         ...parsed,
         monstersOwned: migratedMonsters,
-        eggs: parsed.eggs || [],
+        eggs: (parsed.eggs || []).filter((egg: any) => egg != null),
         customHabits: parsed.customHabits || defaultState.customHabits,
         categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility,
         unlockedMilestones: parsed.unlockedMilestones || []
