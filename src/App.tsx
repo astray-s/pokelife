@@ -62,7 +62,7 @@ import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
-import { getPokemonFact, getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
+import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -4186,10 +4186,6 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
                     <span className="text-xs text-slate-500">Favorite Food:</span>
                     <span className="text-xs font-bold text-slate-700">{selected.favoriteFood}</span>
                   </div>
-                </div>
-                
-                <div className="bg-orange-50 p-3 rounded-xl">
-                  <p className="text-xs text-orange-900 italic">💡 {getPokemonFact(selected)}</p>
                 </div>
               </div>
             </motion.div>
