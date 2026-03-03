@@ -586,13 +586,6 @@ const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
 
 // --- Utils ---
 
-// Dark mode helper for card backgrounds
-const cardBg = (darkMode: boolean) => darkMode ? 'bg-slate-800' : 'bg-white';
-const cardBorder = (darkMode: boolean) => darkMode ? 'border-slate-700' : 'border-slate-100';
-const cardText = (darkMode: boolean) => darkMode ? 'text-slate-100' : 'text-slate-800';
-const cardTextMuted = (darkMode: boolean) => darkMode ? 'text-slate-400' : 'text-slate-600';
-const inputBg = (darkMode: boolean) => darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200';
-
 const getTodayISO = () => {
   // Get current date in PST/PDT (Los Angeles timezone)
   const now = new Date();
@@ -731,29 +724,27 @@ export default function App() {
       const parsed = JSON.parse(saved);
       
       // Migrate old Pokemon to have characteristics
-      const migratedMonsters = (parsed.monstersOwned || [])
-        .filter((mon: any) => mon != null) // Filter out null/undefined entries
-        .map((mon: any) => {
-          if (!mon.height || !mon.nature) {
-            // Old Pokemon without characteristics - add them
-            const characteristics = generatePokemonCharacteristics(
-              { id: mon.id, name: mon.name, rarity: mon.rarity, imageUrl: mon.imageUrl },
-              mon.isShiny || false
-            );
-            return {
-              ...mon,
-              ...characteristics
-            };
-          }
-          return mon;
-        });
+      const migratedMonsters = (parsed.monstersOwned || []).map((mon: any) => {
+        if (!mon.height || !mon.nature) {
+          // Old Pokemon without characteristics - add them
+          const characteristics = generatePokemonCharacteristics(
+            { id: mon.id, name: mon.name, rarity: mon.rarity, imageUrl: mon.imageUrl },
+            mon.isShiny || false
+          );
+          return {
+            ...mon,
+            ...characteristics
+          };
+        }
+        return mon;
+      });
       
       // Merge with defaults to ensure new properties exist
       return {
         ...defaultState,
         ...parsed,
         monstersOwned: migratedMonsters,
-        eggs: (parsed.eggs || []).filter((egg: any) => egg != null),
+        eggs: parsed.eggs || [],
         customHabits: parsed.customHabits || defaultState.customHabits,
         categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility,
         unlockedMilestones: parsed.unlockedMilestones || []
@@ -793,10 +784,6 @@ export default function App() {
   const [hatchedPokemon, setHatchedPokemon] = useState<CaughtPokemon | null>(null);
   const [showHabitManager, setShowHabitManager] = useState(false);
   const [editingHabit, setEditingHabit] = useState<{ category: keyof CustomHabits; habit: HabitDefinition } | null>(null);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('synthPoke_darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
 
   // --- Persistence ---
   const isResettingRef = React.useRef(false);
@@ -825,10 +812,6 @@ export default function App() {
     if (isResettingRef.current) return;
     localStorage.setItem('synthPoke_bosses', JSON.stringify(bosses));
   }, [bosses]);
-
-  useEffect(() => {
-    localStorage.setItem('synthPoke_darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
 
   useEffect(() => {
     if (isResettingRef.current) return;
@@ -1492,21 +1475,20 @@ export default function App() {
   const progress = Math.min(1, xpIntoLevel / xpRequiredForNext);
 
   return (
-    <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
-      <div className={`min-h-screen bg-[#FDFCF0] dark:bg-slate-950 text-[#4A4A4A] dark:text-slate-100 transition-colors duration-300`}>
-        {/* Header */}
-        <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800`}>
+    <div className="min-h-screen bg-[#FDFCF0] text-[#4A4A4A] font-sans pb-24">
+      {/* Header */}
+      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E4D8] px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.div 
               whileHover={{ rotate: 20 }}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner border relative overflow-hidden bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800"
+              className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center shadow-inner border border-red-100 relative overflow-hidden"
             >
               <PokeBallIcon className="text-red-500" size={28} />
               <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent pointer-events-none" />
             </motion.div>
             <div>
-              <h1 className="font-black text-xl tracking-tight flex items-center gap-2 text-slate-800 dark:text-slate-100">
+              <h1 className="font-black text-xl tracking-tight text-slate-800 flex items-center gap-2">
                 PokeLife
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold uppercase tracking-tighter">v2.0</span>
               </h1>
@@ -1630,15 +1612,6 @@ export default function App() {
               <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45 border-l border-t border-slate-800" />
             </div>
           </div>
-          
-          {/* Dark Mode Toggle */}
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="ml-4 w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-110 bg-slate-800/10 dark:bg-yellow-500/20 text-slate-600 dark:text-yellow-400 hover:bg-slate-800/20 dark:hover:bg-yellow-500/30"
-            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {darkMode ? '☀️' : '🌙'}
-          </button>
         </div>
       </header>
 
@@ -1905,7 +1878,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 backdrop-blur-lg border-t px-2 py-2 z-40 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-[#E8E4D8] px-2 py-2 z-40">
         <div className="max-w-2xl mx-auto flex justify-around items-center">
           <TabButton 
             active={activeTab === 'home'} 
@@ -2055,7 +2028,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-      </div>
     </div>
   );
 }
@@ -2828,31 +2800,31 @@ function HomeTab({
       {/* LEFT COLUMN */}
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div className="p-6 rounded-3xl border-2 relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 border-blue-100 dark:border-slate-600">
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full -mr-12 -mt-12 bg-blue-200/20 dark:bg-slate-600/20" />
-          <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full -ml-10 -mb-10 bg-indigo-200/20 dark:bg-slate-600/20" />
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-3xl border-2 border-blue-100 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-200/20 rounded-full -mr-12 -mt-12" />
+          <div className="absolute bottom-0 left-0 w-20 h-20 bg-indigo-200/20 rounded-full -ml-10 -mb-10" />
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white dark:bg-slate-700">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
                 <Trophy className="text-yellow-500" size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-800 dark:text-slate-100">Welcome Back!</h2>
-                <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                <h2 className="text-lg font-black text-slate-800">Welcome Back!</h2>
+                <p className="text-xs text-slate-600 font-medium">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Progress Chart */}
-        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
+        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
               <TrendingUp className="text-white" size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">7-Day Progress</h3>
-              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Your XP journey</p>
+              <h3 className="text-sm font-black text-slate-800">7-Day Progress</h3>
+              <p className="text-[10px] text-slate-500 font-medium">Your XP journey</p>
             </div>
           </div>
           <div className="h-40">
@@ -2897,15 +2869,15 @@ function HomeTab({
         </div>
 
         {/* Today's Tasks */}
-        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
+        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Target className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Today's Tasks</h3>
-                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{todaysTasks.length} pending</p>
+                <h3 className="text-sm font-black text-slate-800">Today's Tasks</h3>
+                <p className="text-[10px] text-slate-500 font-medium">{todaysTasks.length} pending</p>
               </div>
             </div>
             <button 
@@ -3014,15 +2986,15 @@ function HomeTab({
       {/* RIGHT COLUMN */}
       <div className="space-y-6">
         {/* Daily Quests */}
-        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
+        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
                 <ScrollText className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Daily Quests</h3>
-                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{completedDailyQuests}/{dailyQuests.length} completed</p>
+                <h3 className="text-sm font-black text-slate-800">Daily Quests</h3>
+                <p className="text-[10px] text-slate-500 font-medium">{completedDailyQuests}/{dailyQuests.length} completed</p>
               </div>
             </div>
             <button 
@@ -3071,15 +3043,15 @@ function HomeTab({
         </div>
 
         {/* Weekly Quests */}
-        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
+        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Calendar className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Weekly Quests</h3>
-                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
+                <h3 className="text-sm font-black text-slate-800">Weekly Quests</h3>
+                <p className="text-[10px] text-slate-500 font-medium">{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
               </div>
             </div>
             <button 
@@ -3129,15 +3101,15 @@ function HomeTab({
 
         {/* Mini Bosses */}
         {bosses.filter(b => b.type === 'mini' && !b.defeated).length > 0 && (
-          <div className="p-5 rounded-3xl border-2 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/50 dark:to-pink-900/50 border-purple-100 dark:border-purple-700">
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-3xl border-2 border-purple-100">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Mini Boss</h3>
-                  <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                  <h3 className="text-sm font-black text-slate-800">Mini Boss</h3>
+                  <p className="text-[10px] text-slate-600 font-medium">
                     {bosses.filter(b => b.type === 'mini' && !b.defeated)[0].name}
                   </p>
                 </div>
@@ -3180,15 +3152,15 @@ function HomeTab({
 
         {/* Weekly Boss */}
         {weeklyBoss && (
-          <div className="p-5 rounded-3xl border-2 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/50 dark:to-orange-900/50 border-red-100 dark:border-red-700">
+          <div className="bg-gradient-to-br from-red-50 to-orange-50 p-5 rounded-3xl border-2 border-red-100">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Weekly Boss</h3>
-                  <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300">{weeklyBoss.name}</p>
+                  <h3 className="text-sm font-black text-slate-800">Weekly Boss</h3>
+                  <p className="text-[10px] text-slate-600 font-medium">{weeklyBoss.name}</p>
                 </div>
               </div>
               <button 
@@ -4177,7 +4149,7 @@ function TasksTab({
       {activeTasks.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 px-2">Active Tasks</h3>
-          {activeTasks.filter(task => task != null).map(task => (
+          {activeTasks.map(task => (
             <motion.div
               key={task.id}
               layout
@@ -4217,7 +4189,7 @@ function TasksTab({
       {completedTasks.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 px-2">Completed Today</h3>
-          {completedTasks.filter(task => task != null).map(task => (
+          {completedTasks.map(task => (
             <motion.div
               key={task.id}
               layout
@@ -4307,7 +4279,7 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {monsters.filter(m => m != null).map((m, index) => (
+              {monsters.map((m, index) => (
                 <div key={m.instanceId}>
                   <PokemonAppear delay={index * 0.05}>
                     <motion.div 
@@ -4370,7 +4342,7 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {eggs.filter(egg => egg != null).map((egg, index) => (
+              {eggs.map((egg, index) => (
                 <div key={egg.id}>
                   <BounceIn delay={index * 0.05}>
                     <motion.div 
@@ -4530,7 +4502,7 @@ function BossTab({ boss, bosses }: { boss: WeeklyBoss | null; bosses: Boss[] }) 
       {activeBosses.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Active Battles</h3>
-          {activeBosses.filter(b => b != null).map(miniBoss => (
+          {activeBosses.map(miniBoss => (
             <BossCard key={miniBoss.id} boss={miniBoss} />
           ))}
         </div>
@@ -4544,7 +4516,7 @@ function BossTab({ boss, bosses }: { boss: WeeklyBoss | null; bosses: Boss[] }) 
         <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Recently Defeated</h3>
           <div className="grid grid-cols-2 gap-3">
-            {defeatedBosses.filter(b => b != null).map(b => (
+            {defeatedBosses.map(b => (
               <div key={b.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 opacity-60">
                 <div className="text-xs font-bold text-slate-600">{b.name}</div>
                 <div className="text-[10px] text-slate-400 mt-1">
