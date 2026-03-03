@@ -4177,7 +4177,7 @@ function TasksTab({
       {activeTasks.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 px-2">Active Tasks</h3>
-          {activeTasks.map(task => (
+          {activeTasks.filter(task => task != null).map(task => (
             <motion.div
               key={task.id}
               layout
@@ -4217,7 +4217,7 @@ function TasksTab({
       {completedTasks.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 px-2">Completed Today</h3>
-          {completedTasks.map(task => (
+          {completedTasks.filter(task => task != null).map(task => (
             <motion.div
               key={task.id}
               layout
@@ -4307,7 +4307,7 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {monsters.map((m, index) => (
+              {monsters.filter(m => m != null).map((m, index) => (
                 <div key={m.instanceId}>
                   <PokemonAppear delay={index * 0.05}>
                     <motion.div 
@@ -4370,7 +4370,7 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {eggs.map((egg, index) => (
+              {eggs.filter(egg => egg != null).map((egg, index) => (
                 <div key={egg.id}>
                   <BounceIn delay={index * 0.05}>
                     <motion.div 
@@ -4530,7 +4530,7 @@ function BossTab({ boss, bosses }: { boss: WeeklyBoss | null; bosses: Boss[] }) 
       {activeBosses.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Active Battles</h3>
-          {activeBosses.map(miniBoss => (
+          {activeBosses.filter(b => b != null).map(miniBoss => (
             <BossCard key={miniBoss.id} boss={miniBoss} />
           ))}
         </div>
@@ -4544,7 +4544,7 @@ function BossTab({ boss, bosses }: { boss: WeeklyBoss | null; bosses: Boss[] }) 
         <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Recently Defeated</h3>
           <div className="grid grid-cols-2 gap-3">
-            {defeatedBosses.map(b => (
+            {defeatedBosses.filter(b => b != null).map(b => (
               <div key={b.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 opacity-60">
                 <div className="text-xs font-bold text-slate-600">{b.name}</div>
                 <div className="text-[10px] text-slate-400 mt-1">
