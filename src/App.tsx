@@ -3439,18 +3439,33 @@ function TodayTab({
             </h3>
             {categoryVisibility.business && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <InputGroup label="Hours Worked" value={form.workHours} onChange={v => handleChange('workHours', parseFloat(v) || 0)} metricKey="workHours" step="0.5" />
-              <InputGroup label="Discovery Calls" value={form.discoveryCalls} onChange={v => handleChange('discoveryCalls', parseInt(v) || 0)} metricKey="discoveryCalls" />
-              <InputGroup label="Networking Calls" value={form.networkingCalls} onChange={v => handleChange('networkingCalls', parseInt(v) || 0)} metricKey="networkingCalls" />
-              <InputGroup label="Sales Calls" value={form.salesCalls} onChange={v => handleChange('salesCalls', parseInt(v) || 0)} metricKey="salesCalls" />
-              <InputGroup label="First DMs Sent" value={form.firstDmsSent} onChange={v => handleChange('firstDmsSent', parseInt(v) || 0)} metricKey="firstDmsSent" />
-              <InputGroup label="Follow-ups Sent" value={form.followUpsSent} onChange={v => handleChange('followUpsSent', parseInt(v) || 0)} metricKey="followUpsSent" />
-              <InputGroup label="Commenting (Mins)" value={form.commentingMinutes} onChange={v => handleChange('commentingMinutes', parseInt(v) || 0)} metricKey="commentingMinutes" />
-              <InputGroup label="Posts Created" value={form.postsCreated} onChange={v => handleChange('postsCreated', parseInt(v) || 0)} metricKey="postsCreated" />
-              <InputGroup label="Posts Posted" value={form.postsPosted} onChange={v => handleChange('postsPosted', parseInt(v) || 0)} metricKey="postsPosted" />
-              <InputGroup label="Calls Booked" value={form.callsBooked} onChange={v => handleChange('callsBooked', parseInt(v) || 0)} metricKey="callsBooked" />
-              <InputGroup label="Calls Taken" value={form.callsTaken} onChange={v => handleChange('callsTaken', parseInt(v) || 0)} metricKey="callsTaken" />
-              <InputGroup label="Total DMs Sent" value={form.totalDmsSent} onChange={v => handleChange('totalDmsSent', parseInt(v) || 0)} metricKey="totalDmsSent" />
+              {customHabits.business.map(habit => {
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : 0);
+                if (habit.type === 'boolean') {
+                  return (
+                    <CheckboxGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      checked={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      metricKey={habit.id}
+                    />
+                  );
+                } else {
+                  return (
+                    <InputGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, habit.type === 'number' ? (parseFloat(v) || 0) : v)} 
+                      metricKey={habit.id}
+                      step={habit.step}
+                      min={habit.min}
+                      max={habit.max}
+                    />
+                  );
+                }
+              })}
             </div>
             )}
           </section>
@@ -3475,12 +3490,53 @@ function TodayTab({
             </h3>
             {categoryVisibility.health && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <TimeInputGroup label="Time Asleep (Goal 9 PM)" value={form.timeAsleep} onChange={v => handleChange('timeAsleep', v)} metricKey="timeAsleep" />
-              <TimeInputGroup label="Time Awake (Goal 5 AM)" value={form.timeAwake} onChange={v => handleChange('timeAwake', v)} metricKey="timeAwake" />
-              <InputGroup label="Cold Showers" value={form.coldShowers} onChange={v => handleChange('coldShowers', parseInt(v) || 0)} metricKey="coldShowers" />
-              <InputGroup label="Fast (Hours)" value={form.fastHours} onChange={v => handleChange('fastHours', parseFloat(v) || 0)} metricKey="fastHours" step="0.5" />
-              <DropdownGroup label="Exercise Type" value={form.exerciseType} onChange={v => handleChange('exerciseType', v)} options={['none', 'upper', 'lower', 'cardio']} />
-              <CheckboxGroup label="Food Tracking" checked={form.foodTracking} onChange={v => handleChange('foodTracking', v)} metricKey="foodTracking" />
+              {customHabits.health.map(habit => {
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'dropdown' ? (habit.options?.[0] || '') : 0);
+                if (habit.type === 'boolean') {
+                  return (
+                    <CheckboxGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      checked={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      metricKey={habit.id}
+                    />
+                  );
+                } else if (habit.type === 'dropdown' && habit.options) {
+                  return (
+                    <DropdownGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      options={habit.options}
+                    />
+                  );
+                } else if (habit.id === 'timeAsleep' || habit.id === 'timeAwake') {
+                  return (
+                    <TimeInputGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      metricKey={habit.id}
+                    />
+                  );
+                } else {
+                  return (
+                    <InputGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, parseFloat(v) || 0)} 
+                      metricKey={habit.id}
+                      step={habit.step}
+                      min={habit.min}
+                      max={habit.max}
+                    />
+                  );
+                }
+              })}
             </div>
             )}
           </section>
@@ -3505,11 +3561,15 @@ function TodayTab({
             </h3>
             {categoryVisibility.trainerBoosts && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <CheckboxGroup label="Affirmations" checked={form.affirmations} onChange={v => handleChange('affirmations', v)} metricKey="affirmations" />
-              <CheckboxGroup label="Visualizations" checked={form.visualizations} onChange={v => handleChange('visualizations', v)} metricKey="visualizations" />
-              <CheckboxGroup label="Plan Tomorrow" checked={form.planTomorrow} onChange={v => handleChange('planTomorrow', v)} metricKey="planTomorrow" />
-              <CheckboxGroup label="Story List" checked={form.storyList} onChange={v => handleChange('storyList', v)} metricKey="storyList" />
-              <CheckboxGroup label="Journal" checked={form.journal} onChange={v => handleChange('journal', v)} metricKey="journal" />
+              {customHabits.trainerBoosts.map(habit => (
+                <CheckboxGroup 
+                  key={habit.id}
+                  label={habit.label} 
+                  checked={(form as any)[habit.id] ?? false} 
+                  onChange={v => handleChange(habit.id, v)} 
+                  metricKey={habit.id}
+                />
+              ))}
             </div>
             )}
           </section>
@@ -3538,11 +3598,16 @@ function TodayTab({
               Leave unchecked for bonus percentage!
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <CheckboxGroup label="YouTube" checked={form.youtube} onChange={v => handleChange('youtube', v)} variant="danger" metricKey="youtube" />
-              <CheckboxGroup label="Reels" checked={form.reels} onChange={v => handleChange('reels', v)} variant="danger" metricKey="reels" />
-              <CheckboxGroup label="Shorts" checked={form.shorts} onChange={v => handleChange('shorts', v)} variant="danger" metricKey="shorts" />
-              <CheckboxGroup label="Processed Food" checked={form.processedFood} onChange={v => handleChange('processedFood', v)} variant="danger" metricKey="processedFood" />
-              <CheckboxGroup label="Gaming" checked={form.gaming} onChange={v => handleChange('gaming', v)} variant="danger" metricKey="gaming" />
+              {customHabits.statusEffects.map(habit => (
+                <CheckboxGroup 
+                  key={habit.id}
+                  label={habit.label} 
+                  checked={(form as any)[habit.id] ?? false} 
+                  onChange={v => handleChange(habit.id, v)} 
+                  variant="danger" 
+                  metricKey={habit.id}
+                />
+              ))}
             </div>
             </>
             )}
