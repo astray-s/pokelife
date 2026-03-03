@@ -3114,15 +3114,19 @@ function HomeTab({
         </div>
 
         {/* Weekly Quests */}
-        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className={`p-5 rounded-3xl shadow-xl border ${
+          darkMode 
+            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
+            : 'bg-white border-slate-100 shadow-slate-200/50'
+        }`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Calendar className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800">Weekly Quests</h3>
-                <p className="text-[10px] text-slate-500 font-medium">{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
+                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Weekly Quests</h3>
+                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
               </div>
             </div>
             <button 
@@ -3172,15 +3176,19 @@ function HomeTab({
 
         {/* Mini Bosses */}
         {bosses.filter(b => b.type === 'mini' && !b.defeated).length > 0 && (
-          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-3xl border-2 border-purple-100">
+          <div className={`p-5 rounded-3xl border-2 ${
+            darkMode 
+              ? 'bg-gradient-to-br from-purple-900/50 to-pink-900/50 border-purple-700' 
+              : 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-100'
+          }`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800">Mini Boss</h3>
-                  <p className="text-[10px] text-slate-600 font-medium">
+                  <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mini Boss</h3>
+                  <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {bosses.filter(b => b.type === 'mini' && !b.defeated)[0].name}
                   </p>
                 </div>
@@ -3223,15 +3231,19 @@ function HomeTab({
 
         {/* Weekly Boss */}
         {weeklyBoss && (
-          <div className="bg-gradient-to-br from-red-50 to-orange-50 p-5 rounded-3xl border-2 border-red-100">
+          <div className={`p-5 rounded-3xl border-2 ${
+            darkMode 
+              ? 'bg-gradient-to-br from-red-900/50 to-orange-900/50 border-red-700' 
+              : 'bg-gradient-to-br from-red-50 to-orange-50 border-red-100'
+          }`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800">Weekly Boss</h3>
-                  <p className="text-[10px] text-slate-600 font-medium">{weeklyBoss.name}</p>
+                  <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Weekly Boss</h3>
+                  <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{weeklyBoss.name}</p>
                 </div>
               </div>
               <button 
