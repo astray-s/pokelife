@@ -1,4 +1,4 @@
-import { DailyMetrics, CaughtPokemon, Pokemon } from './types';
+import { DailyMetrics, CaughtPokemon, Rarity } from './types';
 
 export interface Milestone {
   id: string;
@@ -7,7 +7,7 @@ export interface Milestone {
   badge: string; // Emoji
   checkCondition: (metrics: Record<string, DailyMetrics>) => boolean;
   reward: {
-    pokemon: Pokemon;
+    rarity: Rarity;
     message: string;
   };
 }
@@ -43,13 +43,8 @@ export const MILESTONES: Milestone[] = [
       return maxConsecutive >= 10;
     },
     reward: {
-      pokemon: {
-        id: 'machamp',
-        name: 'Machamp',
-        rarity: 'epic',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/68.png'
-      },
-      message: 'Your dedication to deep work has summoned Machamp, the ultimate productivity champion!'
+      rarity: 'epic',
+      message: 'Your dedication to deep work has earned you an Epic Egg!'
     }
   },
   {
@@ -81,13 +76,8 @@ export const MILESTONES: Milestone[] = [
       return maxConsecutive >= 7;
     },
     reward: {
-      pokemon: {
-        id: 'pidgeot',
-        name: 'Pidgeot',
-        rarity: 'rare',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/18.png'
-      },
-      message: 'Your early morning discipline has attracted Pidgeot, the dawn guardian!'
+      rarity: 'rare',
+      message: 'Your early morning discipline has earned you a Rare Egg!'
     }
   },
   {
@@ -100,13 +90,8 @@ export const MILESTONES: Milestone[] = [
       return totalSalesCalls >= 50;
     },
     reward: {
-      pokemon: {
-        id: 'meowth',
-        name: 'Meowth',
-        rarity: 'rare',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/52.png'
-      },
-      message: 'Your sales mastery has attracted Meowth, the coin collector!'
+      rarity: 'rare',
+      message: 'Your sales mastery has earned you a Rare Egg!'
     }
   },
   {
@@ -119,13 +104,8 @@ export const MILESTONES: Milestone[] = [
       return totalColdShowers >= 30;
     },
     reward: {
-      pokemon: {
-        id: 'lapras',
-        name: 'Lapras',
-        rarity: 'epic',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/131.png'
-      },
-      message: 'Your resilience to cold has summoned Lapras, the ice guardian!'
+      rarity: 'epic',
+      message: 'Your resilience to cold has earned you an Epic Egg!'
     }
   },
   {
@@ -138,13 +118,8 @@ export const MILESTONES: Milestone[] = [
       return totalPosts >= 100;
     },
     reward: {
-      pokemon: {
-        id: 'porygon',
-        name: 'Porygon',
-        rarity: 'epic',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/137.png'
-      },
-      message: 'Your content creation prowess has materialized Porygon, the digital master!'
+      rarity: 'epic',
+      message: 'Your content creation prowess has earned you an Epic Egg!'
     }
   },
   {
@@ -174,13 +149,8 @@ export const MILESTONES: Milestone[] = [
       return maxConsecutive >= 7;
     },
     reward: {
-      pokemon: {
-        id: 'ditto',
-        name: 'Ditto',
-        rarity: 'epic',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/132.png'
-      },
-      message: 'Your perfect consistency has attracted Ditto, the transformation master!'
+      rarity: 'epic',
+      message: 'Your perfect consistency has earned you an Epic Egg!'
     }
   },
   {
@@ -193,13 +163,8 @@ export const MILESTONES: Milestone[] = [
       return totalDMs >= 500;
     },
     reward: {
-      pokemon: {
-        id: 'alakazam',
-        name: 'Alakazam',
-        rarity: 'epic',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png'
-      },
-      message: 'Your networking genius has summoned Alakazam, the connection master!'
+      rarity: 'epic',
+      message: 'Your networking genius has earned you an Epic Egg!'
     }
   },
   {
@@ -212,13 +177,8 @@ export const MILESTONES: Milestone[] = [
       return exerciseDays >= 30;
     },
     reward: {
-      pokemon: {
-        id: 'hitmonlee',
-        name: 'Hitmonlee',
-        rarity: 'rare',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/106.png'
-      },
-      message: 'Your fitness dedication has attracted Hitmonlee, the kicking master!'
+      rarity: 'rare',
+      message: 'Your fitness dedication has earned you a Rare Egg!'
     }
   },
   {
@@ -231,13 +191,8 @@ export const MILESTONES: Milestone[] = [
       return totalCallsBooked >= 25;
     },
     reward: {
-      pokemon: {
-        id: 'mr-mime',
-        name: 'Mr. Mime',
-        rarity: 'rare',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/122.png'
-      },
-      message: 'Your persuasion skills have attracted Mr. Mime, the communication expert!'
+      rarity: 'rare',
+      message: 'Your persuasion skills have earned you a Rare Egg!'
     }
   },
   {
@@ -265,13 +220,8 @@ export const MILESTONES: Milestone[] = [
       return maxConsecutive >= 21;
     },
     reward: {
-      pokemon: {
-        id: 'meditite',
-        name: 'Meditite',
-        rarity: 'rare',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/307.png'
-      },
-      message: 'Your mindfulness practice has attracted Meditite, the meditation master!'
+      rarity: 'rare',
+      message: 'Your mindfulness practice has earned you a Rare Egg!'
     }
   },
   {
@@ -284,13 +234,8 @@ export const MILESTONES: Milestone[] = [
       return totalXP >= 10000;
     },
     reward: {
-      pokemon: {
-        id: 'dragonite',
-        name: 'Dragonite',
-        rarity: 'legendary',
-        imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/149.png'
-      },
-      message: 'Your legendary dedication has summoned Dragonite, the ultimate champion!'
+      rarity: 'legendary',
+      message: 'Your legendary dedication has earned you a Legendary Egg!'
     }
   }
 ];

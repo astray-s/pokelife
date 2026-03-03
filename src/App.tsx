@@ -60,6 +60,7 @@ import { exportHabitsToCSV, exportTasksToCSV } from './exportToSheets';
 import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './googleSheetsSync';
 import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
+import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -674,7 +675,7 @@ const getXPForLevel = (level: number) => level * level * 150;
 // --- Components ---
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'today' | 'quests' | 'pokemon' | 'eggs' | 'boss' | 'tasks' | 'history'>('home');
   const [syncSettings, setSyncSettings] = useState<SyncSettings>(getSyncSettings);
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [newMilestone, setNewMilestone] = useState<{ milestone: Milestone; pokemon: CaughtPokemon } | null>(null);
@@ -690,6 +691,7 @@ export default function App() {
       totalXP: 0,
       level: 0,
       monstersOwned: [],
+      eggs: [],
       questsSinceDrop: 0,
       lastDailyReset: '',
       lastWeeklyReset: '',
@@ -714,6 +716,7 @@ export default function App() {
       return {
         ...defaultState,
         ...parsed,
+        eggs: parsed.eggs || [],
         customHabits: parsed.customHabits || defaultState.customHabits,
         categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility,
         unlockedMilestones: parsed.unlockedMilestones || []
@@ -743,7 +746,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [newDrop, setNewDrop] = useState<{ pokemon?: Pokemon; item?: string } | null>(null);
+  const [newDrop, setNewDrop] = useState<{ pokemon?: Pokemon; item?: string; egg?: Egg } | null>(null);
+  const [hatchingEgg, setHatchingEgg] = useState<Egg | null>(null);
+  const [hatchedPokemon, setHatchedPokemon] = useState<CaughtPokemon | null>(null);
 
   // --- Persistence ---
   const isResettingRef = React.useRef(false);
@@ -874,30 +879,31 @@ export default function App() {
       const newlyUnlocked = checkMilestones(newMetrics, unlockedMilestones);
       
       if (newlyUnlocked.length > 0) {
-        // Unlock the first new milestone
+        // Unlock the first new milestone - give an egg
         const milestone = newlyUnlocked[0];
-        const isShiny = Math.random() < 0.05; // 5% chance for shiny milestone reward
-        const pokemon: CaughtPokemon = {
-          ...milestone.reward.pokemon,
-          instanceId: Math.random().toString(36).substr(2, 9),
-          caughtAt: new Date().toISOString(),
-          isShiny
+        
+        const milestoneEgg: Egg = {
+          id: Math.random().toString(36).substr(2, 9),
+          rarity: milestone.reward.rarity,
+          obtainedAt: new Date().toISOString(),
+          source: 'milestone'
         };
         
         setPlayerState(prev => ({
           ...prev,
-          monstersOwned: [pokemon, ...prev.monstersOwned],
+          eggs: [milestoneEgg, ...prev.eggs],
           unlockedMilestones: [
             ...(prev.unlockedMilestones || []),
             {
               milestoneId: milestone.id,
               unlockedAt: new Date().toISOString(),
-              pokemon
+              pokemon: null as any // Will be filled when egg is hatched
             }
           ]
         }));
         
-        setNewMilestone({ milestone, pokemon });
+        setNewMilestone({ milestone, pokemon: null as any });
+        setNewDrop({ egg: milestoneEgg });
       }
       
       // Auto-sync if enabled
@@ -940,30 +946,30 @@ export default function App() {
       const newTotal = Math.max(0, prev.totalXP + amount);
       const newLevel = getLevel(newTotal);
       
-      let newMonsters = [...prev.monstersOwned];
+      let newEggs = [...prev.eggs];
       if (newLevel > prev.level) {
-        // Unlock specific pokemon based on level
+        // Give an egg based on level
         const rarity = newLevel >= 21 ? 'legendary' : 
                         newLevel >= 13 ? 'epic' : 
                         newLevel >= 6 ? 'rare' : 'uncommon';
-        const pool = POKEMON_POOLS[rarity];
-        const basePokemon = pool[Math.floor(Math.random() * pool.length)];
-        const isShiny = Math.random() < 0.02;
-        const newPokemon: CaughtPokemon = {
-          ...basePokemon,
-          instanceId: Math.random().toString(36).substr(2, 9),
-          caughtAt: new Date().toISOString(),
-          isShiny
+        
+        const levelUpEgg: Egg = {
+          id: Math.random().toString(36).substr(2, 9),
+          rarity,
+          obtainedAt: new Date().toISOString(),
+          source: 'levelup'
         };
-        newMonsters.push(newPokemon);
-        setShowLevelUp({ level: newLevel, pokemon: newPokemon });
+        
+        newEggs.push(levelUpEgg);
+        setShowLevelUp({ level: newLevel, pokemon: null as any }); // We'll update this UI later
+        setNewDrop({ egg: levelUpEgg });
       }
 
       return {
         ...prev,
         totalXP: newTotal,
         level: newLevel,
-        monstersOwned: newMonsters
+        eggs: newEggs
       };
     });
   };
@@ -1026,25 +1032,20 @@ export default function App() {
         else rarity = 'legendary';
       }
 
-      const pool = POKEMON_POOLS[rarity as keyof typeof POKEMON_POOLS];
-      const pokemon = pool[Math.floor(Math.random() * pool.length)];
-      
-      // Shiny check (1% chance)
-      const isShiny = Math.random() < 0.01;
-
-      const caught: CaughtPokemon = {
-        ...pokemon,
-        instanceId: Math.random().toString(36).substr(2, 9),
-        caughtAt: new Date().toISOString(),
-        isShiny
+      // Create an egg instead of directly giving Pokemon
+      const newEgg: Egg = {
+        id: Math.random().toString(36).substr(2, 9),
+        rarity,
+        obtainedAt: new Date().toISOString(),
+        source: guaranteedRare ? 'boss' : 'threshold'
       };
 
       setPlayerState(prev => ({
         ...prev,
-        monstersOwned: [caught, ...prev.monstersOwned],
+        eggs: [newEgg, ...prev.eggs],
         questsSinceDrop: 0
       }));
-      setNewDrop({ pokemon: caught });
+      setNewDrop({ egg: newEgg });
     } else {
       setPlayerState(prev => ({ ...prev, questsSinceDrop: prev.questsSinceDrop + 1 }));
     }
@@ -1065,6 +1066,33 @@ export default function App() {
     updateTotalXP(quest.baseXPReward);
     setQuests(prev => prev.map(q => q.id === questId ? { ...q, status: 'claimed' } : q));
     rollDrop();
+  };
+
+  const handleHatchEgg = (eggId: string) => {
+    const egg = playerState.eggs.find(e => e.id === eggId);
+    if (!egg) return;
+
+    setHatchingEgg(egg);
+    
+    // Animate egg hatching
+    setTimeout(() => {
+      const { pokemon, isShiny } = hatchEgg(egg);
+      const caughtPokemon: CaughtPokemon = {
+        ...pokemon,
+        instanceId: Math.random().toString(36).substr(2, 9),
+        caughtAt: new Date().toISOString(),
+        isShiny
+      };
+
+      setPlayerState(prev => ({
+        ...prev,
+        eggs: prev.eggs.filter(e => e.id !== eggId),
+        monstersOwned: [caughtPokemon, ...prev.monstersOwned]
+      }));
+
+      setHatchedPokemon(caughtPokemon);
+      setHatchingEgg(null);
+    }, 2000); // 2 second hatch animation
   };
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1447,6 +1475,16 @@ export default function App() {
               <PokemonTab monsters={playerState.monstersOwned} />
             </motion.div>
           )}
+          {activeTab === 'eggs' && (
+            <motion.div 
+              key="eggs"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <EggsTab eggs={playerState.eggs} onHatchEgg={handleHatchEgg} />
+            </motion.div>
+          )}
           {activeTab === 'boss' && (
             <motion.div 
               key="boss"
@@ -1623,6 +1661,12 @@ export default function App() {
             label="Dex" 
           />
           <TabButton 
+            active={activeTab === 'eggs'} 
+            onClick={() => setActiveTab('eggs')} 
+            icon={<span className="text-xl">🥚</span>} 
+            label="Eggs" 
+          />
+          <TabButton 
             active={activeTab === 'history'} 
             onClick={() => setActiveTab('history')} 
             icon={<History size={20} />} 
@@ -1656,6 +1700,23 @@ export default function App() {
             milestone={newMilestone.milestone}
             pokemon={newMilestone.pokemon}
             onClose={() => setNewMilestone(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Egg Hatching Modal */}
+      <AnimatePresence>
+        {hatchingEgg && (
+          <EggHatchingModal egg={hatchingEgg} />
+        )}
+      </AnimatePresence>
+
+      {/* Hatched Pokemon Modal */}
+      <AnimatePresence>
+        {hatchedPokemon && (
+          <HatchedPokemonModal 
+            pokemon={hatchedPokemon}
+            onClose={() => setHatchedPokemon(null)}
           />
         )}
       </AnimatePresence>
@@ -1852,8 +1913,8 @@ function LevelUpPopup({ level, pokemon, onClose }: { level: number, pokemon: Cau
   );
 }
 
-function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemon; item?: string }, onClose: () => void }) {
-  const [isRevealed, setIsRevealed] = useState(!drop.pokemon);
+function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemon; item?: string; egg?: Egg }, onClose: () => void }) {
+  const [isRevealed, setIsRevealed] = useState(!drop.pokemon && !drop.egg);
   const [isCatching, setIsCatching] = useState(!!drop.pokemon);
 
   useEffect(() => {
@@ -1863,8 +1924,11 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
         setIsRevealed(true);
       }, 3000);
       return () => clearTimeout(timer);
+    } else if (drop.egg) {
+      // Eggs are revealed immediately
+      setIsRevealed(true);
     }
-  }, [drop.pokemon]);
+  }, [drop.pokemon, drop.egg]);
 
   const pokemon = drop.pokemon as CaughtPokemon | undefined;
 
@@ -1896,7 +1960,50 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
               animate={{ scale: 1, opacity: 1 }}
               className="space-y-6"
             >
-              {drop.pokemon ? (
+              {drop.egg ? (
+                <>
+                  <ConfettiExplosion />
+                  <BounceIn>
+                    <div className={`w-40 h-40 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br ${getEggGradient(drop.egg.rarity)} relative shadow-2xl`}>
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.05, 1],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="text-8xl"
+                      >
+                        🥚
+                      </motion.div>
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i}><Sparkle delay={i * 0.3} /></div>
+                      ))}
+                    </div>
+                  </BounceIn>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${
+                        drop.egg.rarity === 'legendary' ? 'bg-orange-100 text-orange-700' :
+                        drop.egg.rarity === 'epic' ? 'bg-purple-100 text-purple-700' :
+                        drop.egg.rarity === 'rare' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {drop.egg.rarity} Egg
+                      </span>
+                    </div>
+                    <h2 className="text-3xl font-black tracking-tight">Egg Found!</h2>
+                    <p className="text-slate-500 font-medium">
+                      You received a <span className="text-slate-900 font-bold">{drop.egg.rarity} egg</span>!
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      Visit the Eggs tab to hatch it and discover what's inside!
+                    </p>
+                  </div>
+                </>
+              ) : drop.pokemon ? (
                 <>
                   <ConfettiExplosion />
                   <BounceIn>
@@ -2076,6 +2183,155 @@ function MilestonePopup({ milestone, pokemon, onClose }: { milestone: Milestone,
             className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-black text-lg uppercase tracking-[0.2em] hover:from-purple-600 hover:to-pink-600 transition-all shadow-xl shadow-purple-200"
           >
             Amazing!
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function EggHatchingModal({ egg }: { egg: Egg }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-[3rem] shadow-2xl overflow-hidden max-w-sm w-full relative border-4 border-slate-100"
+      >
+        <div className="p-10 text-center space-y-6">
+          <motion.div
+            className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br ${getEggGradient(egg.rarity)} relative shadow-2xl`}
+            animate={{
+              rotate: [-5, 5, -5, 5, -5, 5, 0],
+              scale: [1, 1.05, 1, 1.05, 1]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              repeatDelay: 0.5
+            }}
+          >
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+              }}
+              transition={{
+                duration: 0.5,
+                repeat: Infinity,
+                repeatDelay: 0.5
+              }}
+              className="text-9xl"
+            >
+              🥚
+            </motion.div>
+            {[...Array(5)].map((_, i) => (
+              <div key={i}><Sparkle delay={i * 0.2} /></div>
+            ))}
+          </motion.div>
+          
+          <motion.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-lg font-black text-slate-400 uppercase tracking-[0.2em]"
+          >
+            Hatching...
+          </motion.div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function HatchedPokemonModal({ pokemon, onClose }: { pokemon: CaughtPokemon, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
+      <LevelUpAnimation />
+      <ConfettiExplosion />
+      <motion.div 
+        initial={{ scale: 0.5, opacity: 0, y: 50 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.5, opacity: 0, y: 50 }}
+        className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-[3rem] shadow-2xl overflow-hidden max-w-md w-full relative border-8 border-blue-400"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-white/50 to-transparent pointer-events-none" />
+        
+        <div className="p-10 text-center space-y-6 relative z-10">
+          {/* Title */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-2"
+          >
+            <div className="text-xs font-black text-blue-600 uppercase tracking-[0.3em]">
+              🎉 Egg Hatched!
+            </div>
+            <h2 className="text-3xl font-black tracking-tight text-slate-800">
+              It's a {pokemon.isShiny ? 'Shiny ' : ''}{pokemon.name}!
+            </h2>
+          </motion.div>
+
+          {/* Pokemon */}
+          <BounceIn delay={0.3}>
+            <div className={`w-40 h-40 mx-auto rounded-full flex items-center justify-center bg-gradient-to-br relative ${
+              pokemon.isShiny ? 'from-yellow-100 to-orange-200' :
+              pokemon.rarity === 'legendary' ? 'from-orange-100 to-red-200' :
+              pokemon.rarity === 'epic' ? 'from-purple-100 to-indigo-200' :
+              pokemon.rarity === 'rare' ? 'from-blue-100 to-cyan-200' :
+              'from-slate-100 to-slate-200'
+            }`}>
+              {pokemon.isShiny && <ShinySparkle />}
+              <img 
+                src={pokemon.isShiny ? pokemon.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : pokemon.imageUrl} 
+                alt={pokemon.name} 
+                className="w-32 h-32 object-contain relative z-10"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </BounceIn>
+
+          {/* Rarity Badge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5 }}
+            className="flex items-center justify-center gap-2"
+          >
+            <span className={`text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full ${
+              pokemon.isShiny ? 'bg-yellow-100 text-yellow-700' :
+              pokemon.rarity === 'legendary' ? 'bg-orange-100 text-orange-700' :
+              pokemon.rarity === 'epic' ? 'bg-purple-100 text-purple-700' :
+              pokemon.rarity === 'rare' ? 'bg-blue-100 text-blue-700' :
+              'bg-slate-100 text-slate-700'
+            }`}>
+              {pokemon.rarity} {pokemon.isShiny ? '✨ Shiny' : ''}
+            </span>
+          </motion.div>
+
+          {/* Message */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="bg-blue-100 p-4 rounded-xl"
+          >
+            <p className="text-sm text-blue-900 font-medium">
+              {pokemon.isShiny ? 
+                "Wow! A shiny Pokémon! This is incredibly rare!" :
+                "A new Pokémon has joined your collection!"}
+            </p>
+          </motion.div>
+
+          <motion.button 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            onClick={onClose}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-2xl font-black text-lg uppercase tracking-[0.2em] hover:from-blue-600 hover:to-purple-600 transition-all shadow-xl shadow-blue-200"
+          >
+            Awesome!
           </motion.button>
         </div>
       </motion.div>
@@ -3652,6 +3908,89 @@ function PokemonTab({ monsters }: { monsters: CaughtPokemon[] }) {
           </div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function EggsTab({ eggs, onHatchEgg }: { eggs: Egg[], onHatchEgg: (eggId: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between px-2">
+        <h2 className="text-2xl font-bold">Egg Collection</h2>
+        <div className="text-sm font-medium text-slate-400">{eggs.length} Eggs</div>
+      </div>
+
+      {eggs.length === 0 ? (
+        <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center text-slate-400">
+          <div className="text-6xl mb-4">🥚</div>
+          <p>No eggs yet. Complete quests, defeat bosses, or reach milestones to collect eggs!</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {eggs.map((egg, index) => (
+            <div key={egg.id}>
+              <BounceIn delay={index * 0.05}>
+                <motion.div 
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className={`bg-gradient-to-br ${getEggGradient(egg.rarity)} p-6 rounded-3xl shadow-lg border-4 border-white relative overflow-hidden group cursor-pointer`}
+                  onClick={() => onHatchEgg(egg.id)}
+                >
+                  <div className="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-colors" />
+                  
+                  {/* Sparkles */}
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i}><Sparkle delay={i * 0.3 + index * 0.1} /></div>
+                  ))}
+                  
+                  {/* Egg */}
+                  <motion.div 
+                    className="relative z-10 text-center"
+                    animate={{
+                      rotate: [-2, 2, -2],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <div className="text-7xl mb-2">🥚</div>
+                  </motion.div>
+                  
+                  {/* Info */}
+                  <div className="relative z-10 text-center mt-2">
+                    <div className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full inline-block ${
+                      egg.rarity === 'legendary' ? 'bg-orange-500 text-white' :
+                      egg.rarity === 'epic' ? 'bg-purple-500 text-white' :
+                      egg.rarity === 'rare' ? 'bg-blue-500 text-white' :
+                      'bg-slate-500 text-white'
+                    }`}>
+                      {egg.rarity}
+                    </div>
+                    <div className="text-[10px] text-white/80 mt-1 font-medium">
+                      {egg.source === 'milestone' ? '🏆 Milestone' :
+                       egg.source === 'boss' ? '⚔️ Boss' :
+                       egg.source === 'levelup' ? '⭐ Level Up' :
+                       '🎯 Quest'}
+                    </div>
+                  </div>
+                  
+                  {/* Hatch Button Hint */}
+                  <motion.div 
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    initial={{ opacity: 0 }}
+                    whileHover={{ opacity: 1 }}
+                  >
+                    <div className="text-white font-black text-sm uppercase tracking-widest">
+                      Tap to Hatch
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </BounceIn>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

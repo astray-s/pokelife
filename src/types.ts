@@ -80,10 +80,18 @@ export interface Quest {
   endDate?: string;
 }
 
+export interface Egg {
+  id: string;
+  rarity: Rarity;
+  obtainedAt: string;
+  source: string; // 'quest', 'boss', 'milestone', 'threshold'
+}
+
 export interface PlayerState {
   totalXP: number;
   level: number;
   monstersOwned: CaughtPokemon[];
+  eggs: Egg[];
   questsSinceDrop: number;
   lastDailyReset: string;
   lastWeeklyReset: string;
