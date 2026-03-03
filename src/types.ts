@@ -17,7 +17,6 @@ export interface CaughtPokemon extends Pokemon {
   weight: number; // in kg
   nature: string;
   characteristic: string;
-  favoriteFood: string;
   personality: string;
 }
 

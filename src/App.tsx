@@ -62,7 +62,7 @@ import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
-import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
+import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics, getPokemonEntry } from './pokemonCharacteristics';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -4182,10 +4182,11 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Personality</div>
                   <p className="text-xs text-slate-700 font-medium">{selected.characteristic}</p>
                   <p className="text-xs text-slate-600">{selected.personality}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-slate-500">Favorite Food:</span>
-                    <span className="text-xs font-bold text-slate-700">{selected.favoriteFood}</span>
-                  </div>
+                </div>
+                
+                <div className="bg-slate-100 p-4 rounded-2xl">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pokédex Entry</div>
+                  <p className="text-xs text-slate-700 leading-relaxed">{getPokemonEntry(selected)}</p>
                 </div>
               </div>
             </motion.div>

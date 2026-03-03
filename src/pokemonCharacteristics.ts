@@ -110,7 +110,6 @@ export function generatePokemonCharacteristics(basePokemon: Pokemon, isShiny: bo
   // Randomly select characteristics
   const nature = NATURES[Math.floor(Math.random() * NATURES.length)];
   const characteristic = CHARACTERISTICS[Math.floor(Math.random() * CHARACTERISTICS.length)];
-  const favoriteFood = FAVORITE_FOODS[Math.floor(Math.random() * FAVORITE_FOODS.length)];
   const personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
   
   return {
@@ -120,23 +119,21 @@ export function generatePokemonCharacteristics(basePokemon: Pokemon, isShiny: bo
     weight,
     nature,
     characteristic,
-    favoriteFood,
     personality
   };
 }
 
-// Get a fun fact about the Pokemon based on its characteristics
-export function getPokemonFact(pokemon: CaughtPokemon): string {
-  const facts = [
-    `This ${pokemon.name} is ${pokemon.height}m tall and weighs ${pokemon.weight}kg.`,
-    `Has a ${pokemon.nature} nature and ${pokemon.characteristic.toLowerCase()}.`,
-    `Loves eating ${pokemon.favoriteFood.toLowerCase()} and is ${pokemon.personality.toLowerCase()}.`,
-    `This ${pokemon.isShiny ? 'shiny ' : ''}${pokemon.name} has a unique ${pokemon.nature} personality.`,
-    `At ${pokemon.height}m tall, this ${pokemon.name} is ${pokemon.height > 1 ? 'quite large' : 'pretty small'} for its species.`,
-    `Weighing ${pokemon.weight}kg, this ${pokemon.name} is ${pokemon.weight > 20 ? 'heavier' : 'lighter'} than average.`
+// Get a Pokedex-style entry about the Pokemon
+export function getPokemonEntry(pokemon: CaughtPokemon): string {
+  const entries = [
+    `This ${pokemon.name} measures ${pokemon.height}m in height and weighs ${pokemon.weight}kg. Known for being ${pokemon.personality.toLowerCase()}.`,
+    `A ${pokemon.nature} natured ${pokemon.name} that ${pokemon.characteristic.toLowerCase()}. Stands at ${pokemon.height}m tall.`,
+    `Height: ${pokemon.height}m, Weight: ${pokemon.weight}kg. This ${pokemon.name} has a ${pokemon.nature} nature and is ${pokemon.personality.toLowerCase()}.`,
+    `This specimen is ${getSizeCategory(pokemon.height).toLowerCase()} for its species at ${pokemon.height}m. ${pokemon.characteristic}.`,
+    `Weighing ${pokemon.weight}kg, this ${pokemon.name} is ${getWeightCategory(pokemon.weight).toLowerCase()}. It ${pokemon.characteristic.toLowerCase()}.`
   ];
   
-  return facts[Math.floor(Math.random() * facts.length)];
+  return entries[Math.floor(Math.random() * entries.length)];
 }
 
 // Get size category
