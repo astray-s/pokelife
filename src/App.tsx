@@ -36,7 +36,9 @@ import {
   DailyMetrics, 
   PlayerState, 
   Quest, 
-  WeeklyBoss, 
+  WeeklyBoss,
+  Boss,
+  BossReward,
   CaughtPokemon, 
   Pokemon,
   Rarity,
@@ -48,8 +50,10 @@ import {
   POKEMON_POOLS, 
   DAILY_QUEST_TEMPLATES, 
   WEEKLY_QUEST_TEMPLATES, 
-  BOSS_NAMES, 
+  BOSS_NAMES,
+  MINI_BOSS_NAMES,
   BOSS_DATA,
+  MINI_BOSS_DATA,
   METRIC_KEYS,
   DEFAULT_BUSINESS_HABITS,
   DEFAULT_HEALTH_HABITS,
@@ -62,7 +66,7 @@ import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
-import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics, getPokemonEntry } from './pokemonCharacteristics';
+import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -763,12 +767,17 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [bosses, setBosses] = useState<Boss[]>(() => {
+    const saved = localStorage.getItem('synthPoke_bosses');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('synthPoke_tasks');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [newDrop, setNewDrop] = useState<{ pokemon?: Pokemon; item?: string; egg?: Egg } | null>(null);
+  const [newDrop, setNewDrop] = useState<{ pokemon?: Pokemon; item?: string; egg?: Egg; boss?: Boss } | null>(null);
   const [hatchingEgg, setHatchingEgg] = useState<Egg | null>(null);
   const [hatchedPokemon, setHatchedPokemon] = useState<CaughtPokemon | null>(null);
 
@@ -794,6 +803,11 @@ export default function App() {
     if (isResettingRef.current) return;
     localStorage.setItem('synthPoke_weeklyBoss', JSON.stringify(weeklyBoss));
   }, [weeklyBoss]);
+
+  useEffect(() => {
+    if (isResettingRef.current) return;
+    localStorage.setItem('synthPoke_bosses', JSON.stringify(bosses));
+  }, [bosses]);
 
   useEffect(() => {
     if (isResettingRef.current) return;
@@ -895,8 +909,59 @@ export default function App() {
       setQuests(prev => [...prev.filter(q => q.type !== 'weekly'), ...newWeeklies]);
       setWeeklyBoss(newBoss);
       setPlayerState(prev => ({ ...prev, lastWeeklyReset: currentWeek }));
+      
+      // Clear old mini-bosses from previous week
+      setBosses(prev => prev.filter(b => b.type === 'big' || !b.defeated));
     }
-  }, [playerState.lastDailyReset, playerState.lastWeeklyReset, playerState.level]);
+    
+    // Spawn mini-boss if none active
+    const activeMini = bosses.find(b => b.type === 'mini' && !b.defeated);
+    if (!activeMini && Math.random() < 0.3) { // 30% chance to spawn mini-boss each check
+      spawnMiniBoss();
+    }
+  }, [playerState.lastDailyReset, playerState.lastWeeklyReset, playerState.level, bosses]);
+
+  // Spawn a mini-boss
+  const spawnMiniBoss = () => {
+    const miniBossData = MINI_BOSS_DATA[Math.floor(Math.random() * MINI_BOSS_DATA.length)];
+    const baseHP = 100 + (playerState.level * 20); // Much lower HP than big boss
+    
+    // Determine rewards
+    const rewards: BossReward[] = [];
+    const roll = Math.random();
+    
+    if (roll < 0.02) {
+      // 2% chance for legendary egg
+      rewards.push({ type: 'egg', rarity: 'legendary' });
+    } else if (roll < 0.10) {
+      // 8% chance for epic egg
+      rewards.push({ type: 'egg', rarity: 'epic' });
+    } else if (roll < 0.35) {
+      // 25% chance for rare egg
+      rewards.push({ type: 'egg', rarity: 'rare' });
+    } else if (roll < 0.70) {
+      // 35% chance for uncommon egg
+      rewards.push({ type: 'egg', rarity: 'uncommon' });
+    } else {
+      // 30% chance for XP boost
+      const xpAmount = 100 + (playerState.level * 10);
+      rewards.push({ type: 'xp', amount: xpAmount });
+    }
+    
+    const newBoss: Boss = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'mini',
+      name: miniBossData.name,
+      hpTotal: baseHP,
+      hpRemaining: baseHP,
+      weaknessType: METRIC_KEYS[Math.floor(Math.random() * METRIC_KEYS.length)],
+      defeated: false,
+      spawnedAt: new Date().toISOString(),
+      rewards
+    };
+    
+    setBosses(prev => [...prev, newBoss]);
+  };
 
   const [selectedDate, setSelectedDate] = useState(getTodayISO());
 
@@ -1042,35 +1107,85 @@ export default function App() {
   };
 
   const applyBossDamage = (metrics: any, xpDiff: number) => {
-    if (!weeklyBoss || weeklyBoss.defeated) return;
+    // Apply damage to legacy weekly boss
+    if (weeklyBoss && !weeklyBoss.defeated) {
+      let damage = 0;
+      damage += metrics.workHours * 5;
+      damage += metrics.discoveryCalls * 15;
+      damage += metrics.salesCalls * 25;
+      damage += metrics.postsPosted * 10;
+      damage += metrics.callsBooked * 20;
 
-    let damage = 0;
-    damage += metrics.workHours * 5;
-    damage += metrics.discoveryCalls * 15;
-    damage += metrics.salesCalls * 25;
-    damage += metrics.postsPosted * 10;
-    damage += metrics.callsBooked * 20;
-
-    // Weakness bonus
-    const weaknessValue = metrics[weeklyBoss.weaknessType];
-    if (weaknessValue > 0) {
-      damage += damage * 0.5; // 50% bonus for weakness
-    }
-
-    setWeeklyBoss(prev => {
-      if (!prev) return null;
-      const newHP = Math.max(0, prev.hpRemaining - damage);
-      const justDefeated = newHP === 0 && !prev.defeated;
-      
-      if (justDefeated) {
-        rollDrop(true); // Guaranteed rare+ drop
+      // Weakness bonus
+      const weaknessValue = metrics[weeklyBoss.weaknessType];
+      if (weaknessValue > 0) {
+        damage += damage * 0.5; // 50% bonus for weakness
       }
 
-      return {
-        ...prev,
-        hpRemaining: newHP,
-        defeated: justDefeated || prev.defeated
-      };
+      setWeeklyBoss(prev => {
+        if (!prev) return null;
+        const newHP = Math.max(0, prev.hpRemaining - damage);
+        const justDefeated = newHP === 0 && !prev.defeated;
+        
+        if (justDefeated) {
+          rollDrop(true); // Guaranteed rare+ drop
+        }
+
+        return {
+          ...prev,
+          hpRemaining: newHP,
+          defeated: justDefeated || prev.defeated
+        };
+      });
+    }
+    
+    // Apply damage to all active bosses
+    setBosses(prev => {
+      return prev.map(boss => {
+        if (boss.defeated) return boss;
+        
+        let damage = 0;
+        damage += metrics.workHours * (boss.type === 'mini' ? 10 : 5);
+        damage += metrics.discoveryCalls * (boss.type === 'mini' ? 30 : 15);
+        damage += metrics.salesCalls * (boss.type === 'mini' ? 50 : 25);
+        damage += metrics.postsPosted * (boss.type === 'mini' ? 20 : 10);
+        damage += metrics.callsBooked * (boss.type === 'mini' ? 40 : 20);
+
+        // Weakness bonus
+        const weaknessValue = metrics[boss.weaknessType];
+        if (weaknessValue > 0) {
+          damage += damage * 0.5; // 50% bonus for weakness
+        }
+
+        const newHP = Math.max(0, boss.hpRemaining - damage);
+        const justDefeated = newHP === 0 && !boss.defeated;
+        
+        if (justDefeated) {
+          // Give rewards
+          boss.rewards.forEach(reward => {
+            if (reward.type === 'egg' && reward.rarity) {
+              const newEgg: Egg = {
+                id: Math.random().toString(36).substr(2, 9),
+                rarity: reward.rarity,
+                obtainedAt: new Date().toISOString(),
+                source: boss.type === 'mini' ? 'mini-boss' : 'boss'
+              };
+              setPlayerState(p => ({ ...p, eggs: [newEgg, ...p.eggs] }));
+              setNewDrop({ egg: newEgg, boss });
+            } else if (reward.type === 'xp' && reward.amount) {
+              updateTotalXP(reward.amount);
+              setNewDrop({ item: `XP Boost (+${reward.amount} XP)`, boss });
+            }
+          });
+        }
+
+        return {
+          ...boss,
+          hpRemaining: newHP,
+          defeated: justDefeated || boss.defeated,
+          defeatedAt: justDefeated ? new Date().toISOString() : boss.defeatedAt
+        };
+      });
     });
   };
 
@@ -1195,6 +1310,7 @@ export default function App() {
     setDailyMetrics({});
     setQuests([]);
     setWeeklyBoss(null);
+    setBosses([]);
     
     // Force a clean reload
     window.location.reload();
@@ -1478,6 +1594,7 @@ export default function App() {
                 quests={quests}
                 dailyMetrics={dailyMetrics}
                 weeklyBoss={weeklyBoss}
+                bosses={bosses}
                 isQuestCompleted={isQuestCompleted}
                 onNavigate={(tab) => setActiveTab(tab)}
                 onToggleTask={(taskId) => {
@@ -1560,7 +1677,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <BossTab boss={weeklyBoss} />
+              <BossTab boss={weeklyBoss} bosses={bosses} />
             </motion.div>
           )}
           {activeTab === 'tasks' && (
@@ -2588,6 +2705,7 @@ function HomeTab({
   quests, 
   dailyMetrics,
   weeklyBoss,
+  bosses,
   isQuestCompleted,
   onNavigate,
   onToggleTask
@@ -2596,6 +2714,7 @@ function HomeTab({
   quests: Quest[],
   dailyMetrics: Record<string, DailyMetrics>,
   weeklyBoss: WeeklyBoss | null,
+  bosses: Boss[],
   isQuestCompleted: (quest: Quest) => boolean,
   onNavigate: (tab: 'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history') => void,
   onToggleTask: (taskId: string) => void
@@ -2927,6 +3046,57 @@ function HomeTab({
             )}
           </div>
         </div>
+
+        {/* Mini Bosses */}
+        {bosses.filter(b => b.type === 'mini' && !b.defeated).length > 0 && (
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-3xl border-2 border-purple-100">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <Sword className="text-white" size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Mini Boss</h3>
+                  <p className="text-[10px] text-slate-600 font-medium">
+                    {bosses.filter(b => b.type === 'mini' && !b.defeated)[0].name}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => onNavigate('boss')}
+                className="text-[10px] font-bold text-purple-500 hover:text-purple-600 bg-purple-50 px-2 py-1 rounded-lg transition-colors"
+              >
+                Battle
+              </button>
+            </div>
+            {bosses.filter(b => b.type === 'mini' && !b.defeated).slice(0, 1).map(miniBoss => (
+              <div key={miniBoss.id} className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold">
+                  <span className="text-slate-600">HP</span>
+                  <span className="text-purple-600">{miniBoss.hpRemaining} / {miniBoss.hpTotal}</span>
+                </div>
+                <div className="h-3 bg-white rounded-full overflow-hidden border-2 border-purple-200">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(miniBoss.hpRemaining / miniBoss.hpTotal) * 100}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-slate-600 font-medium">
+                    <span className="font-bold text-purple-600">Weakness:</span> {miniBoss.weaknessType}
+                  </p>
+                  {miniBoss.rewards.length > 0 && (
+                    <span className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+                      🎁 {miniBoss.rewards[0].type === 'egg' ? miniBoss.rewards[0].rarity : 'XP'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Weekly Boss */}
         {weeklyBoss && (
@@ -4183,11 +4353,6 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
                   <p className="text-xs text-slate-700 font-medium">{selected.characteristic}</p>
                   <p className="text-xs text-slate-600">{selected.personality}</p>
                 </div>
-                
-                <div className="bg-slate-100 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pokédex Entry</div>
-                  <p className="text-xs text-slate-700 leading-relaxed">{getPokemonEntry(selected)}</p>
-                </div>
               </div>
             </motion.div>
           </div>
@@ -4198,7 +4363,162 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
 }
 
 
-function BossTab({ boss }: { boss: WeeklyBoss | null }) {
+function BossTab({ boss, bosses }: { boss: WeeklyBoss | null; bosses: Boss[] }) {
+  const activeBosses = bosses.filter(b => !b.defeated);
+  const defeatedBosses = bosses.filter(b => b.defeated).slice(0, 5); // Show last 5 defeated
+  
+  return (
+    <div className="space-y-6">
+      {/* Mini Bosses */}
+      {activeBosses.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Active Battles</h3>
+          {activeBosses.map(miniBoss => (
+            <BossCard key={miniBoss.id} boss={miniBoss} />
+          ))}
+        </div>
+      )}
+      
+      {/* Weekly Boss */}
+      {boss && <BossCard boss={boss} isWeekly />}
+      
+      {/* Recently Defeated */}
+      {defeatedBosses.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Recently Defeated</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {defeatedBosses.map(b => (
+              <div key={b.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 opacity-60">
+                <div className="text-xs font-bold text-slate-600">{b.name}</div>
+                <div className="text-[10px] text-slate-400 mt-1">
+                  {b.type === 'mini' ? '⚔️ Mini Boss' : '👑 Big Boss'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {!boss && activeBosses.length === 0 && (
+        <div className="text-center py-12 text-slate-400">
+          <p className="text-sm font-medium">No active bosses</p>
+          <p className="text-xs mt-2">Keep working to spawn new challenges!</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BossCard({ boss, isWeekly = false }: { boss: Boss | WeeklyBoss; isWeekly?: boolean }) {
+  const hpPercent = (boss.hpRemaining / boss.hpTotal) * 100;
+  const bossData = isWeekly 
+    ? BOSS_DATA.find(b => b.name === boss.name)
+    : MINI_BOSS_DATA.find(b => b.name === boss.name);
+  
+  const rewards = 'rewards' in boss ? boss.rewards : [];
+
+  return (
+    <div className={`bg-white p-6 rounded-3xl shadow-sm border-4 ${isWeekly ? 'border-red-100' : 'border-purple-100'} text-center space-y-6 relative overflow-hidden`}>
+      <div className={`absolute top-0 left-0 w-full h-2 ${isWeekly ? 'bg-red-500/10' : 'bg-purple-500/10'}`} />
+      
+      <div className="space-y-2 relative z-10">
+        <div className="flex items-center justify-center gap-2">
+          <span className={`text-[10px] font-black ${isWeekly ? 'text-red-500 bg-red-50 border-red-100' : 'text-purple-500 bg-purple-50 border-purple-100'} px-3 py-1 rounded-full uppercase tracking-widest border`}>
+            {isWeekly ? '👑 Weekly Boss' : '⚔️ Mini Boss'}
+          </span>
+        </div>
+        <h2 className={`text-2xl font-black tracking-tighter ${isWeekly ? 'text-slate-800' : 'text-purple-800'} uppercase italic`}>{boss.name}</h2>
+      </div>
+
+      <div className="relative w-40 h-40 mx-auto">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.05, 1],
+            rotate: boss.defeated ? 0 : [-1, 1, -1]
+          }}
+          transition={{ repeat: Infinity, duration: 4 }}
+          className={`absolute inset-0 bg-gradient-to-b ${isWeekly ? 'from-red-50' : 'from-purple-50'} to-transparent rounded-full opacity-50`}
+        />
+        <div className="absolute inset-4 bg-white rounded-full shadow-2xl flex items-center justify-center border-8 border-slate-50 overflow-hidden">
+          <motion.div
+            animate={boss.defeated ? {} : {
+              y: [0, -10, 0],
+            }}
+            transition={{ repeat: Infinity, duration: 2 }}
+          >
+            <img 
+              src={bossData?.sprite || 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png'} 
+              alt={boss.name}
+              className={`w-32 h-32 object-contain ${boss.defeated ? 'grayscale opacity-30' : ''}`}
+              referrerPolicy="no-referrer"
+            />
+          </motion.div>
+        </div>
+        {boss.defeated && (
+          <motion.div 
+            initial={{ scale: 0, rotate: -45 }}
+            animate={{ scale: 1, rotate: -12 }}
+            className="absolute inset-0 flex items-center justify-center z-20"
+          >
+            <div className="bg-emerald-500 text-white px-4 py-2 rounded-2xl font-black text-lg shadow-2xl border-4 border-white">
+              DEFEATED
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex justify-between items-end px-2">
+          <div className="text-left">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">HP</div>
+            <div className="text-base font-black text-slate-800 tabular-nums">{Math.ceil(boss.hpRemaining)} <span className="text-slate-300">/ {boss.hpTotal}</span></div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-black text-red-400 uppercase tracking-widest">Weakness</div>
+            <div className="text-xs font-black text-red-500 uppercase italic">{boss.weaknessType}</div>
+          </div>
+        </div>
+        <div className="h-4 bg-slate-100 rounded-full overflow-hidden border-2 border-white shadow-inner relative">
+          <motion.div 
+            className={`h-full relative ${boss.defeated ? 'bg-emerald-500' : isWeekly ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-400' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
+            initial={{ width: '100%' }}
+            animate={{ width: `${hpPercent}%` }}
+          >
+            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:20px_20px] animate-[progress_2s_linear_infinite]" />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Rewards */}
+      {rewards.length > 0 && !boss.defeated && (
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-2xl border border-yellow-100">
+          <div className="text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-2">Rewards</div>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {rewards.map((reward, i) => (
+              <div key={i} className="bg-white px-3 py-1 rounded-full text-xs font-bold text-slate-700 border border-yellow-200">
+                {reward.type === 'egg' ? `${reward.rarity} Egg` : `+${reward.amount} XP`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {boss.defeated && (
+        <motion.div 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100"
+        >
+          <div className="text-xs font-black text-emerald-600 uppercase tracking-widest">Victory!</div>
+          <div className="text-[10px] text-emerald-500 mt-1">Rewards claimed</div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// Legacy BossTab component for weekly boss display
+function LegacyBossDisplay({ boss }: { boss: WeeklyBoss | null }) {
   if (!boss) return null;
 
   const hpPercent = (boss.hpRemaining / boss.hpTotal) * 100;

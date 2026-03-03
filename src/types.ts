@@ -159,6 +159,28 @@ export const TASK_CATEGORY_XP: Record<TaskCategory, number> = {
   learning: 25
 };
 
+export type BossType = 'mini' | 'big';
+
+export interface Boss {
+  id: string;
+  type: BossType;
+  name: string;
+  hpTotal: number;
+  hpRemaining: number;
+  weaknessType: keyof Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>;
+  defeated: boolean;
+  spawnedAt: string;
+  defeatedAt?: string;
+  rewards: BossReward[];
+}
+
+export interface BossReward {
+  type: 'egg' | 'xp';
+  rarity?: Rarity; // For eggs
+  amount?: number; // For XP
+}
+
+// Legacy type for backwards compatibility
 export interface WeeklyBoss {
   weekId: string;
   name: string;

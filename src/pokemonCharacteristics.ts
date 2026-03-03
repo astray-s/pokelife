@@ -43,15 +43,6 @@ const CHARACTERISTICS = [
   'Highly strung'
 ];
 
-// Favorite foods
-const FAVORITE_FOODS = [
-  'Berries', 'Poffins', 'Curry', 'Sandwiches', 'Malasadas',
-  'Sweet treats', 'Spicy food', 'Bitter herbs', 'Sour candies',
-  'Dry crackers', 'Fresh fruit', 'Grilled fish', 'Roasted nuts',
-  'Honey', 'Chocolate', 'Ice cream', 'Pizza', 'Ramen',
-  'Sushi', 'Tacos', 'Burgers', 'Salad', 'Soup'
-];
-
 // Personality traits
 const PERSONALITIES = [
   'Energetic and playful',
@@ -121,19 +112,6 @@ export function generatePokemonCharacteristics(basePokemon: Pokemon, isShiny: bo
     characteristic,
     personality
   };
-}
-
-// Get a Pokedex-style entry about the Pokemon
-export function getPokemonEntry(pokemon: CaughtPokemon): string {
-  const entries = [
-    `This ${pokemon.name} measures ${pokemon.height}m in height and weighs ${pokemon.weight}kg. Known for being ${pokemon.personality.toLowerCase()}.`,
-    `A ${pokemon.nature} natured ${pokemon.name} that ${pokemon.characteristic.toLowerCase()}. Stands at ${pokemon.height}m tall.`,
-    `Height: ${pokemon.height}m, Weight: ${pokemon.weight}kg. This ${pokemon.name} has a ${pokemon.nature} nature and is ${pokemon.personality.toLowerCase()}.`,
-    `This specimen is ${getSizeCategory(pokemon.height).toLowerCase()} for its species at ${pokemon.height}m. ${pokemon.characteristic}.`,
-    `Weighing ${pokemon.weight}kg, this ${pokemon.name} is ${getWeightCategory(pokemon.weight).toLowerCase()}. It ${pokemon.characteristic.toLowerCase()}.`
-  ];
-  
-  return entries[Math.floor(Math.random() * entries.length)];
 }
 
 // Get size category

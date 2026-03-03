@@ -159,17 +159,35 @@ export const WEEKLY_QUEST_TEMPLATES = [
 ];
 
 export const BOSS_DATA = [
-  { name: 'Gym Leader Brock', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/95.png' }, // Onix
-  { name: 'Gym Leader Misty', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/121.png' }, // Starmie
-  { name: 'Gym Leader Lt. Surge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/26.png' }, // Raichu
-  { name: 'Gym Leader Erika', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/45.png' }, // Vileplume
-  { name: 'Gym Leader Koga', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/169.png' }, // Crobat
-  { name: 'Gym Leader Sabrina', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png' }, // Alakazam
-  { name: 'Gym Leader Blaine', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/59.png' }, // Arcanine
-  { name: 'Gym Leader Giovanni', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/34.png' }, // Nidoking
+  // Big Bosses (Weekly)
+  { name: 'Gym Leader Brock', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/95.png', type: 'big' as const },
+  { name: 'Gym Leader Misty', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/121.png', type: 'big' as const },
+  { name: 'Gym Leader Lt. Surge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/26.png', type: 'big' as const },
+  { name: 'Gym Leader Erika', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/45.png', type: 'big' as const },
+  { name: 'Gym Leader Koga', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/169.png', type: 'big' as const },
+  { name: 'Gym Leader Sabrina', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png', type: 'big' as const },
+  { name: 'Gym Leader Blaine', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/59.png', type: 'big' as const },
+  { name: 'Gym Leader Giovanni', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/34.png', type: 'big' as const },
+];
+
+export const MINI_BOSS_DATA = [
+  // Mini Bosses (Daily)
+  { name: 'Team Rocket Grunt', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/20.png', type: 'mini' as const }, // Raticate
+  { name: 'Bug Catcher', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/15.png', type: 'mini' as const }, // Beedrill
+  { name: 'Youngster', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/19.png', type: 'mini' as const }, // Rattata
+  { name: 'Lass', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/35.png', type: 'mini' as const }, // Clefairy
+  { name: 'Hiker', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/74.png', type: 'mini' as const }, // Geodude
+  { name: 'Fisherman', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/129.png', type: 'mini' as const }, // Magikarp
+  { name: 'Swimmer', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/72.png', type: 'mini' as const }, // Tentacool
+  { name: 'Picnicker', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/43.png', type: 'mini' as const }, // Oddish
+  { name: 'Camper', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/58.png', type: 'mini' as const }, // Growlithe
+  { name: 'Beauty', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/52.png', type: 'mini' as const }, // Meowth
+  { name: 'Rocket Admin', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/110.png', type: 'mini' as const }, // Weezing
+  { name: 'Ace Trainer', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/38.png', type: 'mini' as const }, // Ninetales
 ];
 
 export const BOSS_NAMES = BOSS_DATA.map(b => b.name);
+export const MINI_BOSS_NAMES = MINI_BOSS_DATA.map(b => b.name);
 
 export const METRIC_KEYS = [
   // Main Attacks (Business)
