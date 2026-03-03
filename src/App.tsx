@@ -586,6 +586,13 @@ const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
 
 // --- Utils ---
 
+// Dark mode helper for card backgrounds
+const cardBg = (darkMode: boolean) => darkMode ? 'bg-slate-800' : 'bg-white';
+const cardBorder = (darkMode: boolean) => darkMode ? 'border-slate-700' : 'border-slate-100';
+const cardText = (darkMode: boolean) => darkMode ? 'text-slate-100' : 'text-slate-800';
+const cardTextMuted = (darkMode: boolean) => darkMode ? 'text-slate-400' : 'text-slate-600';
+const inputBg = (darkMode: boolean) => darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200';
+
 const getTodayISO = () => {
   // Get current date in PST/PDT (Los Angeles timezone)
   const now = new Date();
@@ -1669,6 +1676,7 @@ export default function App() {
                 bosses={bosses}
                 isQuestCompleted={isQuestCompleted}
                 onNavigate={(tab) => setActiveTab(tab)}
+                darkMode={darkMode}
                 onToggleTask={(taskId) => {
                   const task = tasks.find(t => t.id === taskId);
                   if (task && !task.completed) {
@@ -2799,6 +2807,7 @@ function HomeTab({
   bosses,
   isQuestCompleted,
   onNavigate,
+  darkMode,
   onToggleTask
 }: { 
   tasks: Task[], 
@@ -2808,6 +2817,7 @@ function HomeTab({
   bosses: Boss[],
   isQuestCompleted: (quest: Quest) => boolean,
   onNavigate: (tab: 'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history') => void,
+  darkMode: boolean,
   onToggleTask: (taskId: string) => void
 }) {
   const today = getTodayISO();
@@ -2839,31 +2849,45 @@ function HomeTab({
       {/* LEFT COLUMN */}
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-3xl border-2 border-blue-100 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-200/20 rounded-full -mr-12 -mt-12" />
-          <div className="absolute bottom-0 left-0 w-20 h-20 bg-indigo-200/20 rounded-full -ml-10 -mb-10" />
+        <div className={`p-6 rounded-3xl border-2 relative overflow-hidden ${
+          darkMode 
+            ? 'bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600' 
+            : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'
+        }`}>
+          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full -mr-12 -mt-12 ${
+            darkMode ? 'bg-slate-600/20' : 'bg-blue-200/20'
+          }`} />
+          <div className={`absolute bottom-0 left-0 w-20 h-20 rounded-full -ml-10 -mb-10 ${
+            darkMode ? 'bg-slate-600/20' : 'bg-indigo-200/20'
+          }`} />
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                darkMode ? 'bg-slate-700' : 'bg-white'
+              }`}>
                 <Trophy className="text-yellow-500" size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-800">Welcome Back!</h2>
-                <p className="text-xs text-slate-600 font-medium">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                <h2 className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Welcome Back!</h2>
+                <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Progress Chart */}
-        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className={`p-5 rounded-3xl shadow-xl border ${
+          darkMode 
+            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
+            : 'bg-white border-slate-100 shadow-slate-200/50'
+        }`}>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
               <TrendingUp className="text-white" size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-800">7-Day Progress</h3>
-              <p className="text-[10px] text-slate-500 font-medium">Your XP journey</p>
+              <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>7-Day Progress</h3>
+              <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Your XP journey</p>
             </div>
           </div>
           <div className="h-40">
@@ -2908,15 +2932,19 @@ function HomeTab({
         </div>
 
         {/* Today's Tasks */}
-        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className={`p-5 rounded-3xl shadow-xl border ${
+          darkMode 
+            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
+            : 'bg-white border-slate-100 shadow-slate-200/50'
+        }`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Target className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800">Today's Tasks</h3>
-                <p className="text-[10px] text-slate-500 font-medium">{todaysTasks.length} pending</p>
+                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Today's Tasks</h3>
+                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{todaysTasks.length} pending</p>
               </div>
             </div>
             <button 
@@ -3025,15 +3053,19 @@ function HomeTab({
       {/* RIGHT COLUMN */}
       <div className="space-y-6">
         {/* Daily Quests */}
-        <div className="bg-white p-5 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className={`p-5 rounded-3xl shadow-xl border ${
+          darkMode 
+            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
+            : 'bg-white border-slate-100 shadow-slate-200/50'
+        }`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
                 <ScrollText className="text-white" size={16} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800">Daily Quests</h3>
-                <p className="text-[10px] text-slate-500 font-medium">{completedDailyQuests}/{dailyQuests.length} completed</p>
+                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Daily Quests</h3>
+                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{completedDailyQuests}/{dailyQuests.length} completed</p>
               </div>
             </div>
             <button 
