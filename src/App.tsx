@@ -62,6 +62,7 @@ import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
+import { getPokemonFact, getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -715,10 +716,28 @@ export default function App() {
     
     if (saved) {
       const parsed = JSON.parse(saved);
+      
+      // Migrate old Pokemon to have characteristics
+      const migratedMonsters = (parsed.monstersOwned || []).map((mon: any) => {
+        if (!mon.height || !mon.nature) {
+          // Old Pokemon without characteristics - add them
+          const characteristics = generatePokemonCharacteristics(
+            { id: mon.id, name: mon.name, rarity: mon.rarity, imageUrl: mon.imageUrl },
+            mon.isShiny || false
+          );
+          return {
+            ...mon,
+            ...characteristics
+          };
+        }
+        return mon;
+      });
+      
       // Merge with defaults to ensure new properties exist
       return {
         ...defaultState,
         ...parsed,
+        monstersOwned: migratedMonsters,
         eggs: parsed.eggs || [],
         customHabits: parsed.customHabits || defaultState.customHabits,
         categoryVisibility: parsed.categoryVisibility || defaultState.categoryVisibility,
@@ -1125,12 +1144,8 @@ export default function App() {
     // Animate egg hatching
     setTimeout(() => {
       const { pokemon, isShiny } = hatchEgg(egg);
-      const caughtPokemon: CaughtPokemon = {
-        ...pokemon,
-        instanceId: Math.random().toString(36).substr(2, 9),
-        caughtAt: new Date().toISOString(),
-        isShiny
-      };
+      // Pokemon already has all characteristics from hatchEgg
+      const caughtPokemon: CaughtPokemon = pokemon;
 
       setPlayerState(prev => ({
         ...prev,
@@ -4146,15 +4161,36 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
                 </div>
                 <div className="bg-slate-50 p-4 rounded-2xl text-left space-y-2">
                   <div className="flex justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Height</span>
+                    <span className="font-bold">{selected.height}m ({getSizeCategory(selected.height)})</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Weight</span>
+                    <span className="font-bold">{selected.weight}kg ({getWeightCategory(selected.weight)})</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Nature</span>
+                    <span className="font-bold">{selected.nature}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
                     <span className="text-slate-400 font-medium">Caught On</span>
                     <span className="font-bold">{new Date(selected.caughtAt).toLocaleDateString()}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Origin</span>
-                    <span className="font-bold italic">PokeLife Grinding</span>
+                </div>
+                
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-2xl text-left space-y-2">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Personality</div>
+                  <p className="text-xs text-slate-700 font-medium">{selected.characteristic}</p>
+                  <p className="text-xs text-slate-600">{selected.personality}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-slate-500">Favorite Food:</span>
+                    <span className="text-xs font-bold text-slate-700">{selected.favoriteFood}</span>
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 italic">"A loyal companion earned through consistent life tracking and personal growth."</p>
+                
+                <div className="bg-orange-50 p-3 rounded-xl">
+                  <p className="text-xs text-orange-900 italic">💡 {getPokemonFact(selected)}</p>
+                </div>
               </div>
             </motion.div>
           </div>

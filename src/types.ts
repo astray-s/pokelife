@@ -12,6 +12,13 @@ export interface CaughtPokemon extends Pokemon {
   instanceId: string;
   caughtAt: string;
   isShiny: boolean;
+  // Individual characteristics
+  height: number; // in meters
+  weight: number; // in kg
+  nature: string;
+  characteristic: string;
+  favoriteFood: string;
+  personality: string;
 }
 
 export interface DailyMetrics {

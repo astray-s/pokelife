@@ -1,4 +1,5 @@
-import { Rarity, Pokemon } from './types';
+import { Rarity, Pokemon, CaughtPokemon } from './types';
+import { generatePokemonCharacteristics } from './pokemonCharacteristics';
 
 export interface Egg {
   id: string;
@@ -206,13 +207,23 @@ export const getEggGradient = (rarity: Rarity): string => {
   }
 };
 
-export const hatchEgg = (egg: Egg): { pokemon: Pokemon; isShiny: boolean } => {
+export const hatchEgg = (egg: Egg): { pokemon: CaughtPokemon; isShiny: boolean } => {
   const pool = EXPANDED_POKEMON_POOLS[egg.rarity];
-  const pokemon = pool[Math.floor(Math.random() * pool.length)];
+  const basePokemon = pool[Math.floor(Math.random() * pool.length)];
   
   // Shiny chance: 1% base, 5% for legendary eggs
   const shinyChance = egg.rarity === 'legendary' ? 0.05 : 0.01;
   const isShiny = Math.random() < shinyChance;
   
-  return { pokemon, isShiny };
+  // Generate characteristics
+  const pokemonWithCharacteristics = generatePokemonCharacteristics(basePokemon, isShiny);
+  
+  // Create the caught Pokemon with instance ID and caught date
+  const caughtPokemon: CaughtPokemon = {
+    ...pokemonWithCharacteristics,
+    instanceId: Math.random().toString(36).substr(2, 9),
+    caughtAt: new Date().toISOString()
+  };
+  
+  return { pokemon: caughtPokemon, isShiny };
 };
