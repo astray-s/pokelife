@@ -61,6 +61,7 @@ import { getSyncSettings, saveSyncSettings, syncAllData, SyncSettings } from './
 import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
+import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -684,6 +685,8 @@ export default function App() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCardBlob, setShareCardBlob] = useState<Blob | null>(null);
   const [shareCardStats, setShareCardStats] = useState<WeeklyStats | null>(null);
+  const [backupStatus, setBackupStatus] = useState<string>('');
+  const [showBackupSettings, setShowBackupSettings] = useState(false);
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -777,6 +780,28 @@ export default function App() {
     if (isResettingRef.current) return;
     localStorage.setItem('synthPoke_tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  // Auto-backup to JSON file
+  useEffect(() => {
+    if (isResettingRef.current) return;
+    
+    const backupInfo = getBackupInfo();
+    if (backupInfo.configured) {
+      // Debounce backups to avoid too frequent writes
+      const timeoutId = setTimeout(() => {
+        saveBackup(playerState, dailyMetrics, quests, weeklyBoss, tasks).then(result => {
+          if (result.success) {
+            setBackupStatus('✓ Backed up');
+            setTimeout(() => setBackupStatus(''), 2000);
+          } else {
+            console.error('Backup failed:', result.message);
+          }
+        });
+      }, 1000); // Wait 1 second after last change
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [playerState, dailyMetrics, quests, weeklyBoss, tasks]);
 
   // --- Initialization & Resets ---
   useEffect(() => {
@@ -1593,6 +1618,7 @@ export default function App() {
                 tasks={tasks}
                 syncSettings={syncSettings}
                 syncStatus={syncStatus}
+                backupStatus={backupStatus}
                 onSyncSettingsChange={(settings) => {
                   setSyncSettings(settings);
                   saveSyncSettings(settings);
@@ -1605,6 +1631,31 @@ export default function App() {
                       setTimeout(() => setSyncStatus(''), 3000);
                     });
                   }
+                }}
+                onSetupBackup={async () => {
+                  const result = await setupBackupDirectory();
+                  setBackupStatus(result.message);
+                  setTimeout(() => setBackupStatus(''), 3000);
+                }}
+                onRestoreBackup={async () => {
+                  const result = await restoreFromBackup();
+                  if (result.success && result.data) {
+                    // Restore all data
+                    setPlayerState(result.data.playerState);
+                    setDailyMetrics(result.data.dailyMetrics);
+                    setQuests(result.data.quests);
+                    setWeeklyBoss(result.data.weeklyBoss);
+                    setTasks(result.data.tasks);
+                    setBackupStatus('✓ Restored from backup!');
+                  } else {
+                    setBackupStatus(result.message);
+                  }
+                  setTimeout(() => setBackupStatus(''), 3000);
+                }}
+                onClearBackup={() => {
+                  clearBackupConfig();
+                  setBackupStatus('Backup configuration cleared');
+                  setTimeout(() => setBackupStatus(''), 3000);
                 }}
                 onDelete={(date) => setEntryToDelete(date)} 
                 onReset={() => setShowResetConfirm(true)} 
@@ -4189,13 +4240,17 @@ function BossTab({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, tasks, syncSettings, syncStatus, onSyncSettingsChange, onManualSync, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
   syncSettings: SyncSettings,
   syncStatus: string,
+  backupStatus: string,
   onSyncSettingsChange: (settings: SyncSettings) => void,
   onManualSync: () => void,
+  onSetupBackup: () => void,
+  onRestoreBackup: () => void,
+  onClearBackup: () => void,
   onDelete: (date: string) => void,
   onReset: () => void,
   onEditDate: (date: string) => void
@@ -4392,6 +4447,73 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, onSyncSettingsCh
             </div>
           ))
         )}
+      </div>
+
+      {/* JSON Backup Section */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">📁 Local JSON Backup</h3>
+          {backupStatus && (
+            <span className="text-xs font-bold text-green-600">{backupStatus}</span>
+          )}
+        </div>
+        
+        <div className="bg-blue-50 p-4 rounded-xl space-y-2">
+          <div className="text-xs font-bold text-blue-900">Auto-Backup Enabled</div>
+          <div className="text-xs text-blue-700">
+            {(() => {
+              const info = getBackupInfo();
+              if (info.configured) {
+                return (
+                  <>
+                    <div>📂 Saving to: <span className="font-bold">{info.directoryName}/pokelife-backup.json</span></div>
+                    {info.lastBackup && (
+                      <div className="mt-1">Last backup: {new Date(info.lastBackup).toLocaleString()}</div>
+                    )}
+                  </>
+                );
+              }
+              return 'Not configured - Click "Setup Backup" to choose a folder';
+            })()}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <button
+            onClick={onSetupBackup}
+            className="w-full py-3 bg-purple-50 text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-100 transition-all flex items-center justify-center gap-2"
+          >
+            📁 {getBackupInfo().configured ? 'Change' : 'Setup'} Backup Location
+          </button>
+          
+          {getBackupInfo().configured && (
+            <>
+              <button
+                onClick={onRestoreBackup}
+                className="w-full py-3 bg-orange-50 text-orange-700 rounded-xl font-bold text-sm hover:bg-orange-100 transition-all flex items-center justify-center gap-2"
+              >
+                ↩️ Restore from Backup
+              </button>
+              <button
+                onClick={onClearBackup}
+                className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+              >
+                Clear Backup Config
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
+          <div className="font-bold">How it works:</div>
+          <ul className="list-disc list-inside space-y-1 text-[11px]">
+            <li>Choose a folder on your computer once</li>
+            <li>Your data automatically saves to <span className="font-mono bg-white px-1 rounded">pokelife-backup.json</span></li>
+            <li>Updates every time you make changes (debounced)</li>
+            <li>Restore anytime from the backup file</li>
+            <li>Works in Chrome, Edge, and Chromium browsers</li>
+          </ul>
+        </div>
       </div>
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
