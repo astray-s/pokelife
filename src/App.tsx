@@ -1239,8 +1239,20 @@ export default function App() {
         return gteOk && lteOk;
       });
     } else {
-      // Weekly: sum last 7 days or current week
+      // Weekly: sum current week's data
       const weekMetrics = (Object.values(dailyMetrics) as DailyMetrics[]).filter(m => getWeekId(new Date(m.date)) === currentWeek);
+      
+      // Weekly quests require at least 7 days of logged data OR it's Sunday (end of week)
+      const todayDate = new Date();
+      const dayOfWeek = todayDate.getDay(); // 0 = Sunday, 6 = Saturday
+      const hasEnoughDays = weekMetrics.length >= 7;
+      const isEndOfWeek = dayOfWeek === 0; // Sunday
+      
+      // Can only complete if we have 7 days of data OR it's the end of the week
+      if (!hasEnoughDays && !isEndOfWeek) {
+        return false;
+      }
+      
       return quest.requirements.every(req => {
         const total = weekMetrics.reduce((sum, m) => {
           const val = (m[req.metric] as any) === true ? 1 : (m[req.metric] as any) === false ? 0 : (m[req.metric] as number);
@@ -1512,6 +1524,7 @@ export default function App() {
                 isCompleted={isQuestCompleted}
                 getProgress={getQuestProgress}
                 onRefresh={refreshQuests}
+                dailyMetrics={dailyMetrics}
               />
             </motion.div>
           )}
@@ -3498,12 +3511,13 @@ function CheckboxGroup({ label, checked, onChange, variant = "default", metricKe
   );
 }
 
-function QuestsTab({ quests, onClaim, isCompleted, getProgress, onRefresh }: { 
+function QuestsTab({ quests, onClaim, isCompleted, getProgress, onRefresh, dailyMetrics }: { 
   quests: Quest[], 
   onClaim: (id: string) => void,
   isCompleted: (q: Quest) => boolean,
   getProgress: (q: Quest) => any[],
-  onRefresh: () => void
+  onRefresh: () => void,
+  dailyMetrics: Record<string, DailyMetrics>
 }) {
   const dailies = quests.filter(q => q.type === 'daily');
   const weeklies = quests.filter(q => q.type === 'weekly');
@@ -3532,7 +3546,7 @@ function QuestsTab({ quests, onClaim, isCompleted, getProgress, onRefresh }: {
         </div>
         <div className="space-y-3">
           {dailies.map(q => (
-            <QuestCard key={q.id} quest={q} onClaim={onClaim} completed={isCompleted(q)} progress={getProgress(q)} />
+            <QuestCard key={q.id} quest={q} onClaim={onClaim} completed={isCompleted(q)} progress={getProgress(q)} dailyMetrics={dailyMetrics} />
           ))}
         </div>
       </section>
@@ -3544,7 +3558,7 @@ function QuestsTab({ quests, onClaim, isCompleted, getProgress, onRefresh }: {
         </div>
         <div className="space-y-3">
           {weeklies.map(q => (
-            <QuestCard key={q.id} quest={q} onClaim={onClaim} completed={isCompleted(q)} progress={getProgress(q)} />
+            <QuestCard key={q.id} quest={q} onClaim={onClaim} completed={isCompleted(q)} progress={getProgress(q)} dailyMetrics={dailyMetrics} />
           ))}
         </div>
       </section>
@@ -3557,9 +3571,20 @@ interface QuestCardProps {
   onClaim: (id: string) => void;
   completed: boolean;
   progress: any[];
+  dailyMetrics: Record<string, DailyMetrics>;
 }
 
-const QuestCard: React.FC<QuestCardProps> = ({ quest, onClaim, completed, progress }) => {
+const QuestCard: React.FC<QuestCardProps> = ({ quest, onClaim, completed, progress, dailyMetrics }) => {
+  // Check if it's a weekly quest and if we have enough days
+  const isWeekly = quest.type === 'weekly';
+  const currentWeek = getWeekId(new Date());
+  const weekMetrics = isWeekly ? Object.values(dailyMetrics).filter((m: any) => getWeekId(new Date(m.date)) === currentWeek) : [];
+  const daysLogged = weekMetrics.length;
+  const todayDate = new Date();
+  const dayOfWeek = todayDate.getDay(); // 0 = Sunday
+  const isEndOfWeek = dayOfWeek === 0;
+  const canClaimWeekly = daysLogged >= 7 || isEndOfWeek;
+  
   return (
     <motion.div 
       layout
@@ -3589,6 +3614,13 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onClaim, completed, progre
             </motion.div>
           </div>
         </>
+      )}
+      
+      {/* Weekly quest status indicator */}
+      {isWeekly && !completed && !canClaimWeekly && (
+        <div className="mb-3 bg-blue-50 border border-blue-200 rounded-xl p-2 text-xs text-blue-700 font-medium">
+          📅 {daysLogged}/7 days logged this week • {isEndOfWeek ? 'Claimable today!' : `Claimable after ${7 - daysLogged} more day${7 - daysLogged === 1 ? '' : 's'} or on Sunday`}
+        </div>
       )}
 
       <div className="flex justify-between items-start mb-4">
