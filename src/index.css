@@ -9,6 +9,15 @@ body {
   background-color: #FDFCF0;
 }
 
+/* Dark mode support */
+.dark body {
+  background-color: #020617;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
 /* Custom scrollbar for a cleaner look */
 ::-webkit-scrollbar {
   width: 6px;
@@ -23,6 +32,59 @@ body {
   border-radius: 10px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #D1CDC0;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Global dark mode overrides for all white backgrounds */
+.dark .bg-white {
+  background-color: rgb(30 41 59) !important; /* slate-800 */
+}
+
+.dark .bg-slate-50 {
+  background-color: rgb(51 65 85) !important; /* slate-700 */
+}
+
+.dark .bg-slate-100 {
+  background-color: rgb(51 65 85) !important; /* slate-700 */
+}
+
+.dark .border-slate-100 {
+  border-color: rgb(71 85 105) !important; /* slate-600 */
+}
+
+.dark .border-slate-200 {
+  border-color: rgb(71 85 105) !important; /* slate-600 */
+}
+
+.dark .text-slate-800 {
+  color: rgb(226 232 240) !important; /* slate-200 */
+}
+
+.dark .text-slate-700 {
+  color: rgb(203 213 225) !important; /* slate-300 */
+}
+
+.dark .text-slate-600 {
+  color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+.dark .text-slate-500 {
+  color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+.dark .shadow-slate-200\/50 {
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0) !important;
+}
+
+.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3) !important;
 }

@@ -1490,34 +1490,21 @@ export default function App() {
   const progress = Math.min(1, xpIntoLevel / xpRequiredForNext);
 
   return (
-    <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${
-      darkMode 
-        ? 'bg-slate-900 text-slate-100' 
-        : 'bg-[#FDFCF0] text-[#4A4A4A]'
-    }`}>
+    <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+      <div className={`min-h-screen bg-[#FDFCF0] dark:bg-slate-950 text-[#4A4A4A] dark:text-slate-100 transition-colors duration-300`}>
       {/* Header */}
-      <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 ${
-        darkMode
-          ? 'bg-slate-800/90 border-slate-700'
-          : 'bg-white/90 border-[#E8E4D8]'
-      }`}>
+      <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800`}>
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.div 
               whileHover={{ rotate: 20 }}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner border relative overflow-hidden ${
-                darkMode
-                  ? 'bg-red-900/30 border-red-800'
-                  : 'bg-red-50 border-red-100'
-              }`}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner border relative overflow-hidden bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800"
             >
               <PokeBallIcon className="text-red-500" size={28} />
               <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent pointer-events-none" />
             </motion.div>
             <div>
-              <h1 className={`font-black text-xl tracking-tight flex items-center gap-2 ${
-                darkMode ? 'text-slate-100' : 'text-slate-800'
-              }`}>
+              <h1 className="font-black text-xl tracking-tight flex items-center gap-2 text-slate-800 dark:text-slate-100">
                 PokeLife
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold uppercase tracking-tighter">v2.0</span>
               </h1>
@@ -1645,11 +1632,7 @@ export default function App() {
           {/* Dark Mode Toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className={`ml-4 w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-110 ${
-              darkMode
-                ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                : 'bg-slate-800/10 text-slate-600 hover:bg-slate-800/20'
-            }`}
+            className="ml-4 w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-110 bg-slate-800/10 dark:bg-yellow-500/20 text-slate-600 dark:text-yellow-400 hover:bg-slate-800/20 dark:hover:bg-yellow-500/30"
             title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {darkMode ? '☀️' : '🌙'}
@@ -1676,7 +1659,6 @@ export default function App() {
                 bosses={bosses}
                 isQuestCompleted={isQuestCompleted}
                 onNavigate={(tab) => setActiveTab(tab)}
-                darkMode={darkMode}
                 onToggleTask={(taskId) => {
                   const task = tasks.find(t => t.id === taskId);
                   if (task && !task.completed) {
@@ -1921,11 +1903,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Tab Bar */}
-      <nav className={`fixed bottom-0 left-0 right-0 backdrop-blur-lg border-t px-2 py-2 z-40 transition-colors duration-300 ${
-        darkMode
-          ? 'bg-slate-800/90 border-slate-700'
-          : 'bg-white/90 border-[#E8E4D8]'
-      }`}>
+      <nav className="fixed bottom-0 left-0 right-0 backdrop-blur-lg border-t px-2 py-2 z-40 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800">
         <div className="max-w-2xl mx-auto flex justify-around items-center">
           <TabButton 
             active={activeTab === 'home'} 
@@ -2807,7 +2785,6 @@ function HomeTab({
   bosses,
   isQuestCompleted,
   onNavigate,
-  darkMode,
   onToggleTask
 }: { 
   tasks: Task[], 
@@ -2817,7 +2794,6 @@ function HomeTab({
   bosses: Boss[],
   isQuestCompleted: (quest: Quest) => boolean,
   onNavigate: (tab: 'home' | 'today' | 'quests' | 'pokemon' | 'boss' | 'tasks' | 'history') => void,
-  darkMode: boolean,
   onToggleTask: (taskId: string) => void
 }) {
   const today = getTodayISO();
@@ -2849,45 +2825,31 @@ function HomeTab({
       {/* LEFT COLUMN */}
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div className={`p-6 rounded-3xl border-2 relative overflow-hidden ${
-          darkMode 
-            ? 'bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600' 
-            : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'
-        }`}>
-          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full -mr-12 -mt-12 ${
-            darkMode ? 'bg-slate-600/20' : 'bg-blue-200/20'
-          }`} />
-          <div className={`absolute bottom-0 left-0 w-20 h-20 rounded-full -ml-10 -mb-10 ${
-            darkMode ? 'bg-slate-600/20' : 'bg-indigo-200/20'
-          }`} />
+        <div className="p-6 rounded-3xl border-2 relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 border-blue-100 dark:border-slate-600">
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full -mr-12 -mt-12 bg-blue-200/20 dark:bg-slate-600/20" />
+          <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full -ml-10 -mb-10 bg-indigo-200/20 dark:bg-slate-600/20" />
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
-                darkMode ? 'bg-slate-700' : 'bg-white'
-              }`}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white dark:bg-slate-700">
                 <Trophy className="text-yellow-500" size={20} />
               </div>
               <div>
-                <h2 className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Welcome Back!</h2>
-                <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                <h2 className="text-lg font-black text-slate-800 dark:text-slate-100">Welcome Back!</h2>
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Progress Chart */}
-        <div className={`p-5 rounded-3xl shadow-xl border ${
-          darkMode 
-            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
-            : 'bg-white border-slate-100 shadow-slate-200/50'
-        }`}>
+        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
               <TrendingUp className="text-white" size={16} />
             </div>
             <div>
-              <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>7-Day Progress</h3>
-              <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Your XP journey</p>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">7-Day Progress</h3>
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Your XP journey</p>
             </div>
           </div>
           <div className="h-40">
@@ -2932,19 +2894,15 @@ function HomeTab({
         </div>
 
         {/* Today's Tasks */}
-        <div className={`p-5 rounded-3xl shadow-xl border ${
-          darkMode 
-            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
-            : 'bg-white border-slate-100 shadow-slate-200/50'
-        }`}>
+        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Target className="text-white" size={16} />
               </div>
               <div>
-                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Today's Tasks</h3>
-                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{todaysTasks.length} pending</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Today's Tasks</h3>
+                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{todaysTasks.length} pending</p>
               </div>
             </div>
             <button 
@@ -3053,19 +3011,15 @@ function HomeTab({
       {/* RIGHT COLUMN */}
       <div className="space-y-6">
         {/* Daily Quests */}
-        <div className={`p-5 rounded-3xl shadow-xl border ${
-          darkMode 
-            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
-            : 'bg-white border-slate-100 shadow-slate-200/50'
-        }`}>
+        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
                 <ScrollText className="text-white" size={16} />
               </div>
               <div>
-                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Daily Quests</h3>
-                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{completedDailyQuests}/{dailyQuests.length} completed</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Daily Quests</h3>
+                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{completedDailyQuests}/{dailyQuests.length} completed</p>
               </div>
             </div>
             <button 
@@ -3114,19 +3068,15 @@ function HomeTab({
         </div>
 
         {/* Weekly Quests */}
-        <div className={`p-5 rounded-3xl shadow-xl border ${
-          darkMode 
-            ? 'bg-slate-800 border-slate-700 shadow-black/50' 
-            : 'bg-white border-slate-100 shadow-slate-200/50'
-        }`}>
+        <div className="p-5 rounded-3xl shadow-xl border bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-slate-200/50 dark:shadow-black/50">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Calendar className="text-white" size={16} />
               </div>
               <div>
-                <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Weekly Quests</h3>
-                <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Weekly Quests</h3>
+                <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{completedWeeklyQuests}/{weeklyQuests.length} completed</p>
               </div>
             </div>
             <button 
@@ -3176,19 +3126,15 @@ function HomeTab({
 
         {/* Mini Bosses */}
         {bosses.filter(b => b.type === 'mini' && !b.defeated).length > 0 && (
-          <div className={`p-5 rounded-3xl border-2 ${
-            darkMode 
-              ? 'bg-gradient-to-br from-purple-900/50 to-pink-900/50 border-purple-700' 
-              : 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-100'
-          }`}>
+          <div className="p-5 rounded-3xl border-2 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/50 dark:to-pink-900/50 border-purple-100 dark:border-purple-700">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mini Boss</h3>
-                  <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Mini Boss</h3>
+                  <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
                     {bosses.filter(b => b.type === 'mini' && !b.defeated)[0].name}
                   </p>
                 </div>
@@ -3231,19 +3177,15 @@ function HomeTab({
 
         {/* Weekly Boss */}
         {weeklyBoss && (
-          <div className={`p-5 rounded-3xl border-2 ${
-            darkMode 
-              ? 'bg-gradient-to-br from-red-900/50 to-orange-900/50 border-red-700' 
-              : 'bg-gradient-to-br from-red-50 to-orange-50 border-red-100'
-          }`}>
+          <div className="p-5 rounded-3xl border-2 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/50 dark:to-orange-900/50 border-red-100 dark:border-red-700">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg">
                   <Sword className="text-white" size={16} />
                 </div>
                 <div>
-                  <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Weekly Boss</h3>
-                  <p className={`text-[10px] font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{weeklyBoss.name}</p>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Weekly Boss</h3>
+                  <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300">{weeklyBoss.name}</p>
                 </div>
               </div>
               <button 
