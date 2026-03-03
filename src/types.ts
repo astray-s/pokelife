@@ -95,6 +95,7 @@ export interface PlayerState {
   questsSinceDrop: number;
   lastDailyReset: string;
   lastWeeklyReset: string;
+  lastDailyEggClaim?: string; // Track last date daily egg was claimed
   customHabits?: CustomHabits;
   categoryVisibility?: CategoryVisibility;
   unlockedMilestones?: UnlockedMilestone[];

@@ -4,7 +4,7 @@ export interface Egg {
   id: string;
   rarity: Rarity;
   obtainedAt: string;
-  source: string; // 'quest', 'boss', 'milestone', 'threshold'
+  source: string; // 'quest', 'boss', 'milestone', 'threshold', 'daily', 'levelup'
 }
 
 // Expanded Pokemon pool from Kanto to Kalos (Generations 1-6)

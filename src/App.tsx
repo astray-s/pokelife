@@ -906,6 +906,29 @@ export default function App() {
         setNewDrop({ egg: milestoneEgg });
       }
       
+      // Check for daily egg reward (>2 hours of work)
+      const lastClaim = playerState.lastDailyEggClaim;
+      const canClaimToday = lastClaim !== targetDate;
+      const workedEnough = metrics.workHours >= 2;
+      
+      if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
+        // Give daily egg reward
+        const dailyEgg: Egg = {
+          id: Math.random().toString(36).substr(2, 9),
+          rarity: 'rare', // Daily reward is always rare
+          obtainedAt: new Date().toISOString(),
+          source: 'daily'
+        };
+        
+        setPlayerState(prev => ({
+          ...prev,
+          eggs: [dailyEgg, ...prev.eggs],
+          lastDailyEggClaim: targetDate
+        }));
+        
+        setNewDrop({ egg: dailyEgg });
+      }
+      
       // Auto-sync if enabled
       if (syncSettings.autoSync && syncSettings.sheetUrl) {
         syncAllData(newMetrics, tasks, syncSettings.sheetUrl).then(result => {
@@ -1445,6 +1468,8 @@ export default function App() {
                     }
                   }));
                 }}
+                dailyEggClaimed={playerState.lastDailyEggClaim === selectedDate}
+                canClaimDailyEgg={selectedDate === getTodayISO() && playerState.lastDailyEggClaim !== selectedDate}
               />
             </motion.div>
           )}
@@ -1978,12 +2003,20 @@ function DropPopup({ drop, onClose }: { drop: { pokemon?: Pokemon | CaughtPokemo
                         {drop.egg.rarity} Egg
                       </span>
                     </div>
-                    <h2 className="text-3xl font-black tracking-tight">Egg Found!</h2>
+                    <h2 className="text-3xl font-black tracking-tight">
+                      {drop.egg.source === 'daily' ? '🎁 Daily Gift!' : 'Egg Found!'}
+                    </h2>
                     <p className="text-slate-500 font-medium">
-                      You received a <span className="text-slate-900 font-bold">{drop.egg.rarity} egg</span>!
+                      {drop.egg.source === 'daily' ? (
+                        <>You earned your <span className="text-slate-900 font-bold">daily {drop.egg.rarity} egg</span> for working 2+ hours!</>
+                      ) : (
+                        <>You received a <span className="text-slate-900 font-bold">{drop.egg.rarity} egg</span>!</>
+                      )}
                     </p>
                     <p className="text-sm text-slate-400">
-                      Visit the Eggs tab to hatch it and discover what's inside!
+                      {drop.egg.source === 'daily' 
+                        ? 'Come back tomorrow and work 2+ hours for another free egg!' 
+                        : 'Visit the Dex tab to hatch it and discover what\'s inside!'}
                     </p>
                   </div>
                 </>
@@ -2866,14 +2899,18 @@ function TodayTab({
   selectedDate, 
   onDateChange,
   categoryVisibility,
-  onToggleCategory
+  onToggleCategory,
+  dailyEggClaimed,
+  canClaimDailyEgg
 }: { 
   metrics?: DailyMetrics, 
   onSave: (m: any) => void,
   selectedDate: string,
   onDateChange: (date: string) => void,
   categoryVisibility: any,
-  onToggleCategory: (category: string) => void
+  onToggleCategory: (category: string) => void,
+  dailyEggClaimed: boolean,
+  canClaimDailyEgg: boolean
 }) {
   const [form, setForm] = useState({
     // Main Attacks (Business)
@@ -2986,6 +3023,47 @@ function TodayTab({
 
   return (
     <div className="space-y-6 relative">
+      {/* Daily Egg Status Banner */}
+      {canClaimDailyEgg && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-blue-500 to-purple-500 p-4 rounded-2xl shadow-lg text-white relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-white/10" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🎁</div>
+              <div>
+                <div className="font-black text-sm">Daily Gift Available!</div>
+                <div className="text-xs opacity-90">Work 2+ hours today to claim a free Rare Egg</div>
+              </div>
+            </div>
+            <div className="text-2xl">🥚</div>
+          </div>
+        </motion.div>
+      )}
+      
+      {dailyEggClaimed && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 rounded-2xl shadow-lg text-white relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-white/10" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">✅</div>
+              <div>
+                <div className="font-black text-sm">Daily Gift Claimed!</div>
+                <div className="text-xs opacity-90">Come back tomorrow for another free egg</div>
+              </div>
+            </div>
+            <div className="text-2xl">🎉</div>
+          </div>
+        </motion.div>
+      )}
+      
       <div className="bg-white p-6 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
         {/* Decorative Sprites */}
         <div className="absolute -bottom-4 -left-4 pointer-events-none opacity-10">
@@ -3910,6 +3988,7 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
                         </div>
                         <div className="text-[10px] text-white/80 mt-1 font-medium">
                           {egg.source === 'milestone' ? '🏆 Milestone' :
+                           egg.source === 'daily' ? '🎁 Daily Gift' :
                            egg.source === 'boss' ? '⚔️ Boss' :
                            egg.source === 'levelup' ? '⭐ Level Up' :
                            '🎯 Quest'}
