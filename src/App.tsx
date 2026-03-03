@@ -1492,8 +1492,8 @@ export default function App() {
   return (
     <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
       <div className={`min-h-screen bg-[#FDFCF0] dark:bg-slate-950 text-[#4A4A4A] dark:text-slate-100 transition-colors duration-300`}>
-      {/* Header */}
-      <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800`}>
+        {/* Header */}
+        <header className={`backdrop-blur-md sticky top-0 z-30 border-b px-4 py-4 transition-colors duration-300 bg-white/90 dark:bg-slate-900/90 border-[#E8E4D8] dark:border-slate-800`}>
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <motion.div 
@@ -2053,6 +2053,7 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
