@@ -2,7 +2,34 @@
 
 Your app is built and ready to deploy! Choose one of these free hosting options:
 
-## Option 1: Vercel (Recommended - Easiest)
+## Option 1: Cloudflare Pages (Fast & Free)
+
+### Deploy via GitHub (Automatic)
+1. Push your code to GitHub (already done ✓)
+2. Go to https://dash.cloudflare.com/
+3. Click "Workers & Pages" → "Create application" → "Pages"
+4. Connect to GitHub and select your repository
+5. Build settings:
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+   - **Framework preset:** Vite
+6. Click "Save and Deploy"
+7. Done! Your app is live at `your-app.pages.dev`
+
+### Deploy via CLI (Wrangler)
+```bash
+npm install -g wrangler
+wrangler login
+wrangler pages deploy dist --project-name=pokelife
+```
+
+**Benefits:**
+- ⚡ Fastest global CDN
+- 🆓 Unlimited bandwidth
+- 🔒 Free SSL
+- 🌍 Edge network
+
+## Option 2: Vercel (Recommended - Easiest)
 
 ### Deploy via GitHub (Automatic)
 1. Push your code to GitHub (if not already done)
@@ -20,7 +47,7 @@ vercel login
 vercel
 ```
 
-## Option 2: Netlify
+## Option 3: Netlify
 
 ### Deploy via GitHub (Automatic)
 1. Push your code to GitHub
@@ -43,7 +70,7 @@ netlify login
 netlify deploy --prod
 ```
 
-## Option 3: GitHub Pages
+## Option 4: GitHub Pages
 
 1. Install gh-pages:
 ```bash
@@ -65,7 +92,7 @@ npm install --save-dev gh-pages
 npm run deploy
 ```
 
-## Option 4: Firebase Hosting
+## Option 5: Firebase Hosting
 
 Since you already have Firebase set up:
 
