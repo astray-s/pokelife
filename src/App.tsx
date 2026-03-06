@@ -1861,6 +1861,12 @@ export default function App() {
                   setBackupStatus(result.message);
                   setTimeout(() => setBackupStatus(''), 3000);
                 }}
+                onManualBackup={async () => {
+                  setBackupStatus('Backing up...');
+                  const result = await saveBackup(playerState, dailyMetrics, quests, weeklyBoss, tasks);
+                  setBackupStatus(result.success ? '✓ Backup complete!' : result.message);
+                  setTimeout(() => setBackupStatus(''), 3000);
+                }}
                 onRestoreBackup={async () => {
                   const result = await restoreFromBackup();
                   if (result.success && result.data) {
@@ -4994,7 +5000,7 @@ function LegacyBossDisplay({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onManualBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
   syncSettings: SyncSettings,
@@ -5003,6 +5009,7 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, on
   onSyncSettingsChange: (settings: SyncSettings) => void,
   onManualSync: () => void,
   onSetupBackup: () => void,
+  onManualBackup: () => void,
   onRestoreBackup: () => void,
   onClearBackup: () => void,
   onDelete: (date: string) => void,
@@ -5242,6 +5249,12 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, on
           
           {getBackupInfo().configured && (
             <>
+              <button
+                onClick={onManualBackup}
+                className="w-full py-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+              >
+                💾 Backup Now
+              </button>
               <button
                 onClick={onRestoreBackup}
                 className="w-full py-3 bg-orange-50 text-orange-700 rounded-xl font-bold text-sm hover:bg-orange-100 transition-all flex items-center justify-center gap-2"
