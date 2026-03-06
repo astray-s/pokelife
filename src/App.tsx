@@ -978,9 +978,7 @@ export default function App() {
 
   const saveMetrics = (metrics: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, date?: string) => {
     const targetDate = date || getTodayISO();
-    const oldXP = dailyMetrics[targetDate]?.xpEarned || 0;
     const newXP = calculateXP(metrics, targetDate);
-    const xpDiff = newXP - oldXP;
 
     const updatedMetrics: DailyMetrics = {
       ...metrics,
@@ -989,97 +987,130 @@ export default function App() {
       claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
     };
 
-    setDailyMetrics(prev => {
-      const newMetrics = { ...prev, [targetDate]: updatedMetrics };
+    // Update daily metrics first
+    const newDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
+    setDailyMetrics(newDailyMetrics);
+    
+    // Calculate total XP from ALL days (this is the source of truth)
+    const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
+    const oldTotalXP = playerState.totalXP;
+    const totalXPDiff = newTotalXP - oldTotalXP;
+    
+    // Update player's total XP to match the sum of all daily XP
+    setPlayerState(prevPlayer => {
+      const newLevel = getLevel(newTotalXP);
       
-      // Check for milestone unlocks
-      const unlockedMilestones = playerState.unlockedMilestones || [];
-      const newlyUnlocked = checkMilestones(newMetrics, unlockedMilestones);
-      
-      if (newlyUnlocked.length > 0) {
-        // Unlock the first new milestone - give an egg
-        const milestone = newlyUnlocked[0];
+      let newEggs = [...prevPlayer.eggs];
+      if (newLevel > prevPlayer.level) {
+        // Give an egg based on level
+        const rarity = newLevel >= 21 ? 'legendary' : 
+                        newLevel >= 13 ? 'epic' : 
+                        newLevel >= 6 ? 'rare' : 'uncommon';
         
-        const milestoneEgg: Egg = {
+        const levelEgg: Egg = {
           id: Math.random().toString(36).substr(2, 9),
-          rarity: milestone.reward.rarity,
+          rarity,
           obtainedAt: new Date().toISOString(),
-          source: 'milestone'
+          source: 'level'
         };
         
-        setPlayerState(prev => ({
-          ...prev,
-          eggs: [milestoneEgg, ...prev.eggs],
-          unlockedMilestones: [
-            ...(prev.unlockedMilestones || []),
-            {
-              milestoneId: milestone.id,
-              unlockedAt: new Date().toISOString(),
-              pokemon: null as any // Will be filled when egg is hatched
-            }
-          ]
-        }));
-        
-        setNewMilestone({ milestone, pokemon: null as any });
-        setNewDrop({ egg: milestoneEgg });
+        newEggs = [levelEgg, ...newEggs];
+        setNewDrop({ egg: levelEgg });
       }
       
-      // Check for daily egg reward (>2 hours of work)
-      const lastClaim = playerState.lastDailyEggClaim;
-      const canClaimToday = lastClaim !== targetDate;
-      const workedEnough = metrics.workHours >= 2;
-      
-      if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
-        // Give daily egg reward
-        const dailyEgg: Egg = {
-          id: Math.random().toString(36).substr(2, 9),
-          rarity: 'rare', // Daily reward is always rare
-          obtainedAt: new Date().toISOString(),
-          source: 'daily'
-        };
-        
-        setPlayerState(prev => ({
-          ...prev,
-          eggs: [dailyEgg, ...prev.eggs],
-          lastDailyEggClaim: targetDate
-        }));
-        
-        setNewDrop({ egg: dailyEgg });
-      }
-      
-      // Auto-sync if enabled
-      if (syncSettings.autoSync && syncSettings.sheetUrl) {
-        syncAllData(newMetrics, tasks, syncSettings.sheetUrl).then(result => {
-          if (result.success) {
-            setSyncStatus('✓ Synced');
-            setTimeout(() => setSyncStatus(''), 2000);
-          }
-        });
-      }
-      
-      return newMetrics;
+      return {
+        ...prevPlayer,
+        totalXP: newTotalXP,
+        level: newLevel,
+        eggs: newEggs
+      };
     });
     
-    // Always update total XP when there's a difference (positive or negative)
-    if (xpDiff !== 0) {
-      // Show animation for both positive and negative XP changes
-      setShowXPGain(xpDiff);
-      updateTotalXP(xpDiff);
+    // Show animation for XP change
+    if (totalXPDiff !== 0) {
+      setShowXPGain(totalXPDiff);
+    }
+    
+    // Check for milestone unlocks
+    const unlockedMilestones = playerState.unlockedMilestones || [];
+    const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
+    
+    if (newlyUnlocked.length > 0) {
+      // Unlock the first new milestone - give an egg
+      const milestone = newlyUnlocked[0];
       
-      // Only apply boss damage if the log is for the current week
+      const milestoneEgg: Egg = {
+        id: Math.random().toString(36).substr(2, 9),
+        rarity: milestone.reward.rarity,
+        obtainedAt: new Date().toISOString(),
+        source: 'milestone'
+      };
+      
+      setPlayerState(prev => ({
+        ...prev,
+        eggs: [milestoneEgg, ...prev.eggs],
+        unlockedMilestones: [
+          ...(prev.unlockedMilestones || []),
+          {
+            milestoneId: milestone.id,
+            unlockedAt: new Date().toISOString(),
+            pokemon: null as any // Will be filled when egg is hatched
+          }
+        ]
+      }));
+      
+      setNewMilestone({ milestone, pokemon: null as any });
+      setNewDrop({ egg: milestoneEgg });
+    }
+    
+    // Check for daily egg reward (>2 hours of work)
+    const lastClaim = playerState.lastDailyEggClaim;
+    const canClaimToday = lastClaim !== targetDate;
+    const workedEnough = metrics.workHours >= 2;
+    
+    if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
+      // Give daily egg reward
+      const dailyEgg: Egg = {
+        id: Math.random().toString(36).substr(2, 9),
+        rarity: 'rare', // Daily reward is always rare
+        obtainedAt: new Date().toISOString(),
+        source: 'daily'
+      };
+      
+      setPlayerState(prev => ({
+        ...prev,
+        eggs: [dailyEgg, ...prev.eggs],
+        lastDailyEggClaim: targetDate
+      }));
+      
+      setNewDrop({ egg: dailyEgg });
+    }
+    
+    // Auto-sync if enabled
+    if (syncSettings.autoSync && syncSettings.sheetUrl) {
+      syncAllData(newDailyMetrics, tasks, syncSettings.sheetUrl).then(result => {
+        if (result.success) {
+          setSyncStatus('✓ Synced');
+          setTimeout(() => setSyncStatus(''), 2000);
+        }
+      });
+    }
+    
+    // Only apply boss damage if the log is for the current week and XP increased
+    const oldXP = dailyMetrics[targetDate]?.xpEarned || 0;
+    const xpDiff = newXP - oldXP;
+    if (xpDiff > 0) {
       const currentWeek = getWeekId(new Date());
       const targetWeek = getWeekId(new Date(targetDate));
       if (currentWeek === targetWeek) {
         applyBossDamage(metrics, xpDiff);
       }
       
-      // Check for threshold drop (every 80 XP) - only for positive XP
-      if (xpDiff > 0) {
-        const oldThresholds = Math.floor(oldXP / 80);
-        const newThresholds = Math.floor(newXP / 80);
-        if (newThresholds > oldThresholds) {
-          rollDrop();
-        }
+      // Check for threshold drop (every 80 XP)
+      const oldThresholds = Math.floor(oldXP / 80);
+      const newThresholds = Math.floor(newXP / 80);
+      if (newThresholds > oldThresholds) {
+        rollDrop();
       }
     }
   };
