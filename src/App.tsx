@@ -69,6 +69,17 @@ import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToCli
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
 import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
+import { 
+  signInWithGoogle, 
+  signOut as cloudSignOut, 
+  getCurrentUser, 
+  onAuthChange,
+  saveToCloud,
+  loadFromCloud,
+  isFirebaseConfigured,
+  CloudData
+} from './cloudSync';
+import type { User } from 'firebase/auth';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -699,6 +710,11 @@ export default function App() {
   const [shareCardStats, setShareCardStats] = useState<WeeklyStats | null>(null);
   const [backupStatus, setBackupStatus] = useState<string>('');
   const [showBackupSettings, setShowBackupSettings] = useState(false);
+  const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<string>('');
+  const [autoCloudSync, setAutoCloudSync] = useState(() => {
+    return localStorage.getItem('autoCloudSync') === 'true';
+  });
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -844,6 +860,70 @@ export default function App() {
       return () => clearTimeout(timeoutId);
     }
   }, [playerState, dailyMetrics, quests, weeklyBoss, tasks]);
+
+  // Cloud sync - Listen to auth changes
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+    
+    const unsubscribe = onAuthChange((user) => {
+      setCloudUser(user);
+      if (user) {
+        setCloudStatus(`Signed in as ${user.displayName || user.email}`);
+        // Load data from cloud when signing in
+        loadFromCloud().then(result => {
+          if (result.success && result.data) {
+            const shouldRestore = confirm(
+              'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
+              `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
+              'Click OK to restore, or Cancel to keep local data.'
+            );
+            
+            if (shouldRestore) {
+              setPlayerState(result.data.playerState);
+              setDailyMetrics(result.data.dailyMetrics);
+              setQuests(result.data.quests);
+              setWeeklyBoss(result.data.weeklyBoss);
+              setTasks(result.data.tasks);
+              setBosses(result.data.bosses || []);
+              setCloudStatus('✓ Restored from cloud');
+              setTimeout(() => setCloudStatus(''), 3000);
+            }
+          }
+        });
+      } else {
+        setCloudStatus('');
+      }
+    });
+    
+    return unsubscribe;
+  }, []);
+
+  // Auto cloud sync
+  useEffect(() => {
+    if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
+    if (isResettingRef.current) return;
+    
+    const timeoutId = setTimeout(() => {
+      const cloudData: CloudData = {
+        playerState,
+        dailyMetrics,
+        quests,
+        weeklyBoss,
+        tasks,
+        bosses,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      saveToCloud(cloudData).then(result => {
+        if (result.success) {
+          setCloudStatus('☁️ Synced');
+          setTimeout(() => setCloudStatus(''), 2000);
+        }
+      });
+    }, 2000); // Debounce 2 seconds
+    
+    return () => clearTimeout(timeoutId);
+  }, [playerState, dailyMetrics, quests, weeklyBoss, tasks, bosses, cloudUser, autoCloudSync]);
 
   // --- Initialization & Resets ---
   useEffect(() => {
@@ -1384,6 +1464,76 @@ export default function App() {
     });
   };
 
+  // Cloud Sync Functions
+  const handleCloudSignIn = async () => {
+    setCloudStatus('Signing in...');
+    const result = await signInWithGoogle();
+    if (!result.success) {
+      setCloudStatus(result.message);
+      setTimeout(() => setCloudStatus(''), 3000);
+    }
+  };
+
+  const handleCloudSignOut = async () => {
+    const result = await cloudSignOut();
+    setCloudStatus(result.message);
+    setTimeout(() => setCloudStatus(''), 3000);
+  };
+
+  const handleManualCloudSync = async () => {
+    if (!cloudUser) {
+      setCloudStatus('Please sign in first');
+      setTimeout(() => setCloudStatus(''), 3000);
+      return;
+    }
+
+    setCloudStatus('Syncing...');
+    const cloudData: CloudData = {
+      playerState,
+      dailyMetrics,
+      quests,
+      weeklyBoss,
+      tasks,
+      bosses,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const result = await saveToCloud(cloudData);
+    setCloudStatus(result.success ? '✓ Synced to cloud!' : result.message);
+    setTimeout(() => setCloudStatus(''), 3000);
+  };
+
+  const handleCloudRestore = async () => {
+    if (!cloudUser) {
+      setCloudStatus('Please sign in first');
+      setTimeout(() => setCloudStatus(''), 3000);
+      return;
+    }
+
+    setCloudStatus('Loading...');
+    const result = await loadFromCloud();
+    
+    if (result.success && result.data) {
+      setPlayerState(result.data.playerState);
+      setDailyMetrics(result.data.dailyMetrics);
+      setQuests(result.data.quests);
+      setWeeklyBoss(result.data.weeklyBoss);
+      setTasks(result.data.tasks);
+      setBosses(result.data.bosses || []);
+      setCloudStatus('✓ Restored from cloud!');
+    } else {
+      setCloudStatus(result.message);
+    }
+    setTimeout(() => setCloudStatus(''), 3000);
+  };
+
+  const toggleAutoCloudSync = () => {
+    const newValue = !autoCloudSync;
+    setAutoCloudSync(newValue);
+    localStorage.setItem('autoCloudSync', String(newValue));
+  };
+
+
   const factoryReset = () => {
     // Stop all state persistence immediately
     isResettingRef.current = true;
@@ -1859,6 +2009,10 @@ export default function App() {
                 syncSettings={syncSettings}
                 syncStatus={syncStatus}
                 backupStatus={backupStatus}
+                cloudUser={cloudUser}
+                cloudStatus={cloudStatus}
+                autoCloudSync={autoCloudSync}
+                firebaseConfigured={isFirebaseConfigured()}
                 onSyncSettingsChange={(settings) => {
                   setSyncSettings(settings);
                   saveSyncSettings(settings);
@@ -1872,6 +2026,11 @@ export default function App() {
                     });
                   }
                 }}
+                onCloudSignIn={handleCloudSignIn}
+                onCloudSignOut={handleCloudSignOut}
+                onManualCloudSync={handleManualCloudSync}
+                onCloudRestore={handleCloudRestore}
+                onToggleAutoCloudSync={toggleAutoCloudSync}
                 onSetupBackup={async () => {
                   const result = await setupBackupDirectory();
                   setBackupStatus(result.message);
@@ -5160,14 +5319,47 @@ function LegacyBossDisplay({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onManualBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ 
+  metrics, 
+  tasks, 
+  syncSettings, 
+  syncStatus, 
+  backupStatus,
+  cloudUser,
+  cloudStatus,
+  autoCloudSync,
+  firebaseConfigured,
+  onSyncSettingsChange, 
+  onManualSync, 
+  onCloudSignIn,
+  onCloudSignOut,
+  onManualCloudSync,
+  onCloudRestore,
+  onToggleAutoCloudSync,
+  onSetupBackup, 
+  onManualBackup, 
+  onRestoreBackup, 
+  onClearBackup, 
+  onDelete, 
+  onReset, 
+  onEditDate 
+}: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
   syncSettings: SyncSettings,
   syncStatus: string,
   backupStatus: string,
+  cloudUser: User | null,
+  cloudStatus: string,
+  autoCloudSync: boolean,
+  firebaseConfigured: boolean,
   onSyncSettingsChange: (settings: SyncSettings) => void,
   onManualSync: () => void,
+  onCloudSignIn: () => void,
+  onCloudSignOut: () => void,
+  onManualCloudSync: () => void,
+  onCloudRestore: () => void,
+  onToggleAutoCloudSync: () => void,
   onSetupBackup: () => void,
   onManualBackup: () => void,
   onRestoreBackup: () => void,
@@ -5442,6 +5634,90 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, on
           </ul>
         </div>
       </div>
+
+      {/* Cloud Sync Section */}
+      {firebaseConfigured && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-3xl border-2 border-blue-200 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">☁️ Cloud Sync</h3>
+            {cloudStatus && (
+              <span className="text-xs font-bold text-blue-700">{cloudStatus}</span>
+            )}
+          </div>
+
+          {!cloudUser ? (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Sign in with Google to sync your data across all devices!
+              </p>
+              <button
+                onClick={onCloudSignIn}
+                className="w-full py-4 bg-white hover:bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign in with Google
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-white p-4 rounded-xl border border-blue-200">
+                <div className="text-xs font-bold text-slate-600 mb-1">Signed in as:</div>
+                <div className="text-sm font-bold text-slate-800">{cloudUser.displayName || cloudUser.email}</div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-200">
+                <span className="text-sm font-bold text-slate-700">Auto-sync on every update</span>
+                <button
+                  onClick={onToggleAutoCloudSync}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    autoCloudSync ? 'bg-blue-500' : 'bg-slate-300'
+                  }`}
+                >
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                    autoCloudSync ? 'translate-x-6' : ''
+                  }`} />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={onManualCloudSync}
+                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  ☁️ Sync Now
+                </button>
+                <button
+                  onClick={onCloudRestore}
+                  className="w-full py-3 bg-white hover:bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  ↩️ Restore from Cloud
+                </button>
+                <button
+                  onClick={onCloudSignOut}
+                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white/50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
+            <div className="font-bold">✨ Benefits:</div>
+            <ul className="list-disc list-inside space-y-1 text-[11px]">
+              <li>Access your data from any device</li>
+              <li>Automatic real-time sync</li>
+              <li>Never lose your progress</li>
+              <li>Free with Google account</li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
         <div className="flex items-center justify-between">
