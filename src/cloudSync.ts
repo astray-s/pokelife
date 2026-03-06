@@ -2,10 +2,12 @@ import {
   signInWithPopup, 
   signOut as firebaseSignOut, 
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   User
 } from 'firebase/auth';
 import { ref, set, get, onValue, off } from 'firebase/database';
-import { auth, database, googleProvider } from './firebaseConfig';
+import { auth, database } from './firebaseConfig';
 import { DailyMetrics, PlayerState, Quest, WeeklyBoss, Task, Boss } from './types';
 
 export interface CloudData {
@@ -18,10 +20,36 @@ export interface CloudData {
   lastUpdated: string;
 }
 
-// Sign in with Google
-export async function signInWithGoogle(): Promise<{ success: boolean; message: string; user?: User }> {
+// Sign up with email and password
+export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; message: string; user?: User }> {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    return {
+      success: true,
+      message: 'Account created successfully!',
+      user: result.user
+    };
+  } catch (error: any) {
+    console.error('Sign up error:', error);
+    let message = 'Failed to create account';
+    if (error.code === 'auth/email-already-in-use') {
+      message = 'Email already in use';
+    } else if (error.code === 'auth/weak-password') {
+      message = 'Password should be at least 6 characters';
+    } else if (error.code === 'auth/invalid-email') {
+      message = 'Invalid email address';
+    }
+    return {
+      success: false,
+      message
+    };
+  }
+}
+
+// Sign in with email and password
+export async function signInWithEmail(email: string, password: string): Promise<{ success: boolean; message: string; user?: User }> {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
     return {
       success: true,
       message: 'Signed in successfully!',
@@ -29,9 +57,15 @@ export async function signInWithGoogle(): Promise<{ success: boolean; message: s
     };
   } catch (error: any) {
     console.error('Sign in error:', error);
+    let message = 'Failed to sign in';
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      message = 'Invalid email or password';
+    } else if (error.code === 'auth/invalid-email') {
+      message = 'Invalid email address';
+    }
     return {
       success: false,
-      message: error.message || 'Failed to sign in'
+      message
     };
   }
 }

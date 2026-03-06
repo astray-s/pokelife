@@ -6,7 +6,7 @@ This guide will help you set up Firebase for cross-device cloud sync in PokeLife
 - **Free**: Up to 1GB storage and 10GB/month bandwidth on free tier
 - **No Backend Needed**: Firebase handles everything
 - **Real-time Sync**: Changes sync instantly across devices
-- **Google Sign-In**: Simple one-click authentication
+- **Email/Password Auth**: Simple account creation
 
 ## Setup Steps (5 minutes)
 
@@ -18,14 +18,13 @@ This guide will help you set up Firebase for cross-device cloud sync in PokeLife
 4. Disable Google Analytics (optional, not needed)
 5. Click "Create project"
 
-### 2. Enable Google Authentication
+### 2. Enable Email/Password Authentication
 
 1. In your Firebase project, click "Authentication" in the left sidebar
 2. Click "Get started"
-3. Click on "Google" provider
+3. Click on "Email/Password" provider
 4. Toggle "Enable"
-5. Enter a support email (your email)
-6. Click "Save"
+5. Click "Save"
 
 ### 3. Create Realtime Database
 
@@ -87,13 +86,14 @@ const firebaseConfig = {
 
 1. Build your app: `npm run build`
 2. Deploy to your hosting (Vercel, Netlify, etc.)
-3. Open the app and click "Sign in with Google"
+3. Open the app and create an account with email/password
 4. Your data will now sync across all devices!
 
 ## Security Notes
 
 - Your API key is safe to expose in client-side code
 - Database rules ensure users can only access their own data
+- Passwords are securely hashed by Firebase
 - Never share your Firebase project credentials with untrusted parties
 
 ## Troubleshooting
@@ -104,11 +104,13 @@ const firebaseConfig = {
 
 **"Permission denied" error:**
 - Verify your database rules are set correctly
-- Make sure you're signed in with Google
+- Make sure you're signed in
 
-**Sign-in popup blocked:**
-- Allow popups for your domain in browser settings
-- Try signing in again
+**"Email already in use" error:**
+- Use the "Sign in" option instead of "Sign up"
+
+**"Weak password" error:**
+- Password must be at least 6 characters
 
 ## Free Tier Limits
 
