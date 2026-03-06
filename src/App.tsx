@@ -529,6 +529,9 @@ const NumberCounter = ({ value, duration = 1 }: { value: number, duration?: numb
 };
 
 const XPGainAnimation = ({ amount, onComplete }: { amount: number, onComplete?: () => void }) => {
+  const isNegative = amount < 0;
+  const absAmount = Math.abs(amount);
+  
   useEffect(() => {
     if (onComplete) {
       const timer = setTimeout(onComplete, 2000);
@@ -541,7 +544,7 @@ const XPGainAnimation = ({ amount, onComplete }: { amount: number, onComplete?: 
       initial={{ scale: 0, y: 0, opacity: 0 }}
       animate={{ 
         scale: [0, 1.2, 1],
-        y: [0, -20, -40],
+        y: isNegative ? [0, 20, 40] : [0, -20, -40],
         opacity: [0, 1, 1, 0]
       }}
       transition={{ 
@@ -552,11 +555,13 @@ const XPGainAnimation = ({ amount, onComplete }: { amount: number, onComplete?: 
       className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
     >
       <div className="relative">
-        <ParticleExplosion color="#f59e0b" />
-        <div className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-8 py-4 rounded-2xl shadow-2xl border-4 border-white">
-          <div className="text-sm font-black uppercase tracking-widest opacity-80">XP Gained</div>
+        <ParticleExplosion color={isNegative ? "#ef4444" : "#f59e0b"} />
+        <div className={`${isNegative ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-orange-500 to-yellow-500'} text-white px-8 py-4 rounded-2xl shadow-2xl border-4 border-white`}>
+          <div className="text-sm font-black uppercase tracking-widest opacity-80">
+            {isNegative ? 'XP Lost' : 'XP Gained'}
+          </div>
           <div className="text-4xl font-black">
-            +<NumberCounter value={amount} duration={0.8} />
+            {isNegative ? '-' : '+'}<NumberCounter value={absAmount} duration={0.8} />
           </div>
         </div>
       </div>
@@ -1055,7 +1060,9 @@ export default function App() {
       return newMetrics;
     });
     
-    if (xpDiff > 0) {
+    // Always update total XP when there's a difference (positive or negative)
+    if (xpDiff !== 0) {
+      // Show animation for both positive and negative XP changes
       setShowXPGain(xpDiff);
       updateTotalXP(xpDiff);
       
@@ -1066,11 +1073,13 @@ export default function App() {
         applyBossDamage(metrics, xpDiff);
       }
       
-      // Check for threshold drop (every 80 XP)
-      const oldThresholds = Math.floor(oldXP / 80);
-      const newThresholds = Math.floor(newXP / 80);
-      if (newThresholds > oldThresholds) {
-        rollDrop();
+      // Check for threshold drop (every 80 XP) - only for positive XP
+      if (xpDiff > 0) {
+        const oldThresholds = Math.floor(oldXP / 80);
+        const newThresholds = Math.floor(newXP / 80);
+        if (newThresholds > oldThresholds) {
+          rollDrop();
+        }
       }
     }
   };
