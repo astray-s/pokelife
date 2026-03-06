@@ -4229,6 +4229,57 @@ function TasksTab({
 function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[], eggs: Egg[], onHatchEgg: (eggId: string) => void }) {
   const [selected, setSelected] = useState<CaughtPokemon | null>(null);
   const [view, setView] = useState<'pokemon' | 'eggs'>('pokemon');
+  const [filterType, setFilterType] = useState<'all' | 'shiny' | 'regular' | 'legendary' | 'epic' | 'rare' | 'uncommon'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'rarity' | 'name' | 'level'>('recent');
+  const [groupBy, setGroupBy] = useState<'none' | 'rarity' | 'shiny'>('none');
+
+  // Filter Pokemon
+  const filteredMonsters = monsters.filter(m => {
+    if (filterType === 'all') return true;
+    if (filterType === 'shiny') return m.isShiny;
+    if (filterType === 'regular') return !m.isShiny;
+    return m.rarity === filterType;
+  });
+
+  // Sort Pokemon
+  const sortedMonsters = [...filteredMonsters].sort((a, b) => {
+    if (sortBy === 'recent') {
+      return new Date(b.caughtAt).getTime() - new Date(a.caughtAt).getTime();
+    }
+    if (sortBy === 'rarity') {
+      const rarityOrder = { legendary: 4, epic: 3, rare: 2, uncommon: 1 };
+      return rarityOrder[b.rarity] - rarityOrder[a.rarity];
+    }
+    if (sortBy === 'name') {
+      return a.name.localeCompare(b.name);
+    }
+    return 0;
+  });
+
+  // Group Pokemon
+  const groupedMonsters = groupBy === 'none' 
+    ? { 'All Pokemon': sortedMonsters }
+    : groupBy === 'rarity'
+    ? {
+        'Legendary': sortedMonsters.filter(m => m.rarity === 'legendary'),
+        'Epic': sortedMonsters.filter(m => m.rarity === 'epic'),
+        'Rare': sortedMonsters.filter(m => m.rarity === 'rare'),
+        'Uncommon': sortedMonsters.filter(m => m.rarity === 'uncommon')
+      }
+    : {
+        'Shiny': sortedMonsters.filter(m => m.isShiny),
+        'Regular': sortedMonsters.filter(m => !m.isShiny)
+      };
+
+  // Stats
+  const stats = {
+    total: monsters.length,
+    shiny: monsters.filter(m => m.isShiny).length,
+    legendary: monsters.filter(m => m.rarity === 'legendary').length,
+    epic: monsters.filter(m => m.rarity === 'epic').length,
+    rare: monsters.filter(m => m.rarity === 'rare').length,
+    uncommon: monsters.filter(m => m.rarity === 'uncommon').length
+  };
 
   return (
     <div className="space-y-6">
@@ -4258,6 +4309,148 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
         </div>
       </div>
 
+      {/* Stats Bar */}
+      {view === 'pokemon' && monsters.length > 0 && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-100">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
+            <div>
+              <div className="text-xs text-slate-500 font-bold">Total</div>
+              <div className="text-lg font-black text-slate-800">{stats.total}</div>
+            </div>
+            <div>
+              <div className="text-xs text-yellow-500 font-bold">✨ Shiny</div>
+              <div className="text-lg font-black text-yellow-600">{stats.shiny}</div>
+            </div>
+            <div>
+              <div className="text-xs text-purple-500 font-bold">Legendary</div>
+              <div className="text-lg font-black text-purple-600">{stats.legendary}</div>
+            </div>
+            <div>
+              <div className="text-xs text-red-500 font-bold">Epic</div>
+              <div className="text-lg font-black text-red-600">{stats.epic}</div>
+            </div>
+            <div>
+              <div className="text-xs text-blue-500 font-bold">Rare</div>
+              <div className="text-lg font-black text-blue-600">{stats.rare}</div>
+            </div>
+            <div>
+              <div className="text-xs text-green-500 font-bold">Uncommon</div>
+              <div className="text-lg font-black text-green-600">{stats.uncommon}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters and Sorting */}
+      {view === 'pokemon' && monsters.length > 0 && (
+        <div className="space-y-3">
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'all'
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All ({monsters.length})
+            </button>
+            <button
+              onClick={() => setFilterType('shiny')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'shiny'
+                  ? 'bg-yellow-500 text-white'
+                  : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+              }`}
+            >
+              ✨ Shiny ({stats.shiny})
+            </button>
+            <button
+              onClick={() => setFilterType('regular')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'regular'
+                  ? 'bg-slate-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Regular ({stats.total - stats.shiny})
+            </button>
+            <button
+              onClick={() => setFilterType('legendary')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'legendary'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+              }`}
+            >
+              Legendary ({stats.legendary})
+            </button>
+            <button
+              onClick={() => setFilterType('epic')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'epic'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-red-50 text-red-600 hover:bg-red-100'
+              }`}
+            >
+              Epic ({stats.epic})
+            </button>
+            <button
+              onClick={() => setFilterType('rare')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'rare'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+              }`}
+            >
+              Rare ({stats.rare})
+            </button>
+            <button
+              onClick={() => setFilterType('uncommon')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === 'uncommon'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-green-50 text-green-600 hover:bg-green-100'
+              }`}
+            >
+              Uncommon ({stats.uncommon})
+            </button>
+          </div>
+
+          {/* Sort and Group Controls */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border-2 border-slate-200 focus:border-purple-400 focus:outline-none"
+              >
+                <option value="recent">Recently Caught</option>
+                <option value="rarity">Rarity</option>
+                <option value="name">Name (A-Z)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500">Group:</span>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as any)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border-2 border-slate-200 focus:border-purple-400 focus:outline-none"
+              >
+                <option value="none">No Grouping</option>
+                <option value="rarity">By Rarity</option>
+                <option value="shiny">By Shiny Status</option>
+              </select>
+            </div>
+            <div className="ml-auto text-xs font-bold text-slate-500">
+              Showing {filteredMonsters.length} of {monsters.length}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pokemon View */}
       {view === 'pokemon' && (
         <>
@@ -4266,55 +4459,73 @@ function PokemonTab({ monsters, eggs, onHatchEgg }: { monsters: CaughtPokemon[],
               <div className="text-6xl mb-4">🎮</div>
               <p>No Pokémon hatched yet. Collect and hatch eggs to build your collection!</p>
             </div>
+          ) : filteredMonsters.length === 0 ? (
+            <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center text-slate-400">
+              <div className="text-4xl mb-4">🔍</div>
+              <p>No Pokémon match your filters</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {monsters.map((m, index) => (
-                <div key={m.instanceId}>
-                  <PokemonAppear delay={index * 0.05}>
-                    <motion.div 
-                      whileHover={{ scale: 1.05, y: -5 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setSelected(m)}
-                      className={`bg-white p-4 rounded-3xl shadow-sm border cursor-pointer relative overflow-hidden group ${
-                        m.isShiny ? 'border-yellow-400 bg-yellow-50/30' : 'border-slate-100'
-                      }`}
-                    >
-                    {m.isShiny && (
-                      <>
-                        <ShinySparkle />
-                        <FloatingBadge>
-                          <div className="absolute top-2 right-2 text-yellow-500">
-                            <Trophy size={14} />
-                          </div>
-                        </FloatingBadge>
-                      </>
+            <div className="space-y-6">
+              {Object.entries(groupedMonsters).map(([groupName, groupPokemon]) => (
+                groupPokemon.length > 0 && (
+                  <div key={groupName}>
+                    {groupBy !== 'none' && (
+                      <h3 className="text-sm font-black text-slate-600 uppercase tracking-widest mb-3 px-2">
+                        {groupName} ({groupPokemon.length})
+                      </h3>
                     )}
-                    <motion.div 
-                      className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-slate-100 transition-colors"
-                      whileHover={{ rotate: [0, -5, 5, -5, 0] }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <img 
-                        src={m.isShiny ? m.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : m.imageUrl} 
-                        alt={m.name} 
-                        className="w-20 h-20 object-contain"
-                        referrerPolicy="no-referrer"
-                      />
-                    </motion.div>
-                    <div className="text-center">
-                      <div className="font-bold text-sm truncate">{m.isShiny ? `Shiny ${m.name}` : m.name}</div>
-                      <div className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${
-                        m.rarity === 'legendary' ? 'text-orange-600' :
-                        m.rarity === 'epic' ? 'text-purple-600' :
-                        m.rarity === 'rare' ? 'text-blue-600' :
-                        'text-slate-400'
-                      }`}>
-                        {m.rarity}
-                      </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {groupPokemon.map((m, index) => (
+                        <div key={m.instanceId}>
+                          <PokemonAppear delay={index * 0.05}>
+                            <motion.div 
+                              whileHover={{ scale: 1.05, y: -5 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setSelected(m)}
+                              className={`bg-white p-4 rounded-3xl shadow-sm border cursor-pointer relative overflow-hidden group ${
+                                m.isShiny ? 'border-yellow-400 bg-yellow-50/30' : 'border-slate-100'
+                              }`}
+                            >
+                            {m.isShiny && (
+                              <>
+                                <ShinySparkle />
+                                <FloatingBadge>
+                                  <div className="absolute top-2 right-2 text-yellow-500">
+                                    <Trophy size={14} />
+                                  </div>
+                                </FloatingBadge>
+                              </>
+                            )}
+                            <motion.div 
+                              className="aspect-square rounded-2xl bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-slate-100 transition-colors"
+                              whileHover={{ rotate: [0, -5, 5, -5, 0] }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              <img 
+                                src={m.isShiny ? m.imageUrl.replace('/pokemon/', '/pokemon/shiny/') : m.imageUrl} 
+                                alt={m.name} 
+                                className="w-20 h-20 object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                            </motion.div>
+                            <div className="text-center">
+                              <div className="font-bold text-sm truncate">{m.isShiny ? `Shiny ${m.name}` : m.name}</div>
+                              <div className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${
+                                m.rarity === 'legendary' ? 'text-orange-600' :
+                                m.rarity === 'epic' ? 'text-purple-600' :
+                                m.rarity === 'rare' ? 'text-blue-600' :
+                                'text-slate-400'
+                              }`}>
+                                {m.rarity}
+                              </div>
+                            </div>
+                          </motion.div>
+                        </PokemonAppear>
+                        </div>
+                      ))}
                     </div>
-                  </motion.div>
-                </PokemonAppear>
-                </div>
+                  </div>
+                )
               ))}
             </div>
           )}
