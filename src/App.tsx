@@ -668,16 +668,16 @@ const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestId
   const dailyBonus = 0.05 + ((seed % 10) / 100); 
   totalBase *= (1 + dailyBonus);
 
-  // STATUS EFFECTS (Bad Habits) - Reduce XP by up to 20%
+  // STATUS EFFECTS (Bad Habits) - Subtract fixed XP amounts
   let statusPenalty = 0;
-  if (m.youtube) statusPenalty += 5; // 5% penalty
-  if (m.reels) statusPenalty += 5; // 5% penalty
-  if (m.shorts) statusPenalty += 5; // 5% penalty
-  if (m.processedFood) statusPenalty += 5; // 5% penalty
-  if (m.gaming) statusPenalty += 5; // 5% penalty
+  if (m.youtube) statusPenalty += 30; // -30 XP
+  if (m.reels) statusPenalty += 30; // -30 XP
+  if (m.shorts) statusPenalty += 30; // -30 XP
+  if (m.processedFood) statusPenalty += 25; // -25 XP
+  if (m.gaming) statusPenalty += 40; // -40 XP
   
-  // Apply penalty
-  totalBase *= (1 - statusPenalty / 100);
+  // Subtract penalty from total
+  totalBase -= statusPenalty;
 
   return Math.floor(totalBase);
 };
