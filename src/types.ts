@@ -123,7 +123,7 @@ export interface CustomHabits {
 export interface HabitDefinition {
   id: string;
   label: string;
-  type: 'number' | 'boolean' | 'dropdown';
+  type: 'number' | 'boolean' | 'dropdown' | 'text';
   xpValue: number; // XP per unit (or flat XP for boolean)
   options?: string[]; // For dropdown type
   step?: string; // For number inputs

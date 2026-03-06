@@ -1368,6 +1368,22 @@ export default function App() {
     }));
   };
 
+  const reorderHabits = (category: keyof CustomHabits, fromIndex: number, toIndex: number) => {
+    setPlayerState(prev => {
+      const habits = [...prev.customHabits![category]];
+      const [movedHabit] = habits.splice(fromIndex, 1);
+      habits.splice(toIndex, 0, movedHabit);
+      
+      return {
+        ...prev,
+        customHabits: {
+          ...prev.customHabits!,
+          [category]: habits
+        }
+      };
+    });
+  };
+
   const factoryReset = () => {
     // Stop all state persistence immediately
     isResettingRef.current = true;
@@ -2071,6 +2087,7 @@ export default function App() {
             onAddHabit={addHabit}
             onUpdateHabit={updateHabit}
             onDeleteHabit={deleteHabit}
+            onReorderHabits={reorderHabits}
           />
         )}
       </AnimatePresence>
@@ -3475,7 +3492,8 @@ function TodayTab({
             {categoryVisibility.business && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {customHabits.business.map(habit => {
-                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : 0);
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'number' ? 0 : '');
+                
                 if (habit.type === 'boolean') {
                   return (
                     <CheckboxGroup 
@@ -3486,13 +3504,33 @@ function TodayTab({
                       metricKey={habit.id}
                     />
                   );
+                } else if (habit.type === 'dropdown' && habit.options) {
+                  return (
+                    <DropdownGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      options={habit.options}
+                    />
+                  );
+                } else if (habit.type === 'text') {
+                  return (
+                    <TextInputGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      metricKey={habit.id}
+                    />
+                  );
                 } else {
                   return (
                     <InputGroup 
                       key={habit.id}
                       label={habit.label} 
                       value={value} 
-                      onChange={v => handleChange(habit.id, habit.type === 'number' ? (parseFloat(v) || 0) : v)} 
+                      onChange={v => handleChange(habit.id, parseFloat(v) || 0)} 
                       metricKey={habit.id}
                       step={habit.step}
                       min={habit.min}
@@ -3526,7 +3564,7 @@ function TodayTab({
             {categoryVisibility.health && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {customHabits.health.map(habit => {
-                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'dropdown' ? (habit.options?.[0] || '') : 0);
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'dropdown' ? (habit.options?.[0] || '') : habit.type === 'text' ? '' : 0);
                 if (habit.type === 'boolean') {
                   return (
                     <CheckboxGroup 
@@ -3545,6 +3583,16 @@ function TodayTab({
                       value={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       options={habit.options}
+                    />
+                  );
+                } else if (habit.type === 'text') {
+                  return (
+                    <TextInputGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      metricKey={habit.id}
                     />
                   );
                 } else if (habit.id === 'timeAsleep' || habit.id === 'timeAwake') {
@@ -3596,15 +3644,54 @@ function TodayTab({
             </h3>
             {categoryVisibility.trainerBoosts && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customHabits.trainerBoosts.map(habit => (
-                <CheckboxGroup 
-                  key={habit.id}
-                  label={habit.label} 
-                  checked={(form as any)[habit.id] ?? false} 
-                  onChange={v => handleChange(habit.id, v)} 
-                  metricKey={habit.id}
-                />
-              ))}
+              {customHabits.trainerBoosts.map(habit => {
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'text' ? '' : 0);
+                
+                if (habit.type === 'boolean') {
+                  return (
+                    <CheckboxGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      checked={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      metricKey={habit.id}
+                    />
+                  );
+                } else if (habit.type === 'text') {
+                  return (
+                    <TextInputGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      metricKey={habit.id}
+                    />
+                  );
+                } else if (habit.type === 'dropdown' && habit.options) {
+                  return (
+                    <DropdownGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      options={habit.options}
+                    />
+                  );
+                } else {
+                  return (
+                    <InputGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, parseFloat(v) || 0)} 
+                      metricKey={habit.id}
+                      step={habit.step}
+                      min={habit.min}
+                      max={habit.max}
+                    />
+                  );
+                }
+              })}
             </div>
             )}
           </section>
@@ -3633,16 +3720,56 @@ function TodayTab({
               Leave unchecked for bonus percentage!
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customHabits.statusEffects.map(habit => (
-                <CheckboxGroup 
-                  key={habit.id}
-                  label={habit.label} 
-                  checked={(form as any)[habit.id] ?? false} 
-                  onChange={v => handleChange(habit.id, v)} 
-                  variant="danger" 
-                  metricKey={habit.id}
-                />
-              ))}
+              {customHabits.statusEffects.map(habit => {
+                const value = (form as any)[habit.id] ?? (habit.type === 'boolean' ? false : habit.type === 'text' ? '' : 0);
+                
+                if (habit.type === 'boolean') {
+                  return (
+                    <CheckboxGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      checked={value} 
+                      onChange={v => handleChange(habit.id, v)} 
+                      variant="danger" 
+                      metricKey={habit.id}
+                    />
+                  );
+                } else if (habit.type === 'text') {
+                  return (
+                    <TextInputGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      metricKey={habit.id}
+                    />
+                  );
+                } else if (habit.type === 'dropdown' && habit.options) {
+                  return (
+                    <DropdownGroup
+                      key={habit.id}
+                      label={habit.label}
+                      value={value}
+                      onChange={v => handleChange(habit.id, v)}
+                      options={habit.options}
+                    />
+                  );
+                } else {
+                  return (
+                    <InputGroup 
+                      key={habit.id}
+                      label={habit.label} 
+                      value={value} 
+                      onChange={v => handleChange(habit.id, parseFloat(v) || 0)} 
+                      metricKey={habit.id}
+                      step={habit.step}
+                      min={habit.min}
+                      max={habit.max}
+                      variant="danger"
+                    />
+                  );
+                }
+              })}
             </div>
             </>
             )}
@@ -3856,6 +3983,39 @@ function CheckboxGroup({ label, checked, onChange, variant = "default", metricKe
         </div>
         <label className={`text-[10px] font-black uppercase tracking-widest leading-tight cursor-pointer ${isDanger ? 'text-red-400' : 'text-slate-400'}`}>{label}</label>
       </div>
+    </div>
+  );
+}
+
+function TextInputGroup({ label, value, onChange, metricKey }: { 
+  label: string, 
+  value: string, 
+  onChange: (v: string) => void, 
+  metricKey: string
+}) {
+  const pokemonId = METRIC_SPRITES[metricKey] || 25;
+  const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
+
+  return (
+    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:border-orange-200 transition-all group">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 group-hover:bg-orange-50 group-hover:border-orange-100 transition-colors overflow-hidden">
+          <img 
+            src={spriteUrl} 
+            alt={label} 
+            className="w-8 h-8 object-contain pixelated" 
+            referrerPolicy="no-referrer"
+          />
+        </div>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">{label}</label>
+      </div>
+      <input 
+        type="text" 
+        value={value} 
+        onChange={e => onChange(e.target.value)}
+        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 transition-all font-black text-lg text-slate-700"
+        placeholder="Enter text..."
+      />
     </div>
   );
 }
@@ -5382,13 +5542,15 @@ function HabitManagerModal({
   onClose, 
   onAddHabit, 
   onUpdateHabit, 
-  onDeleteHabit 
+  onDeleteHabit,
+  onReorderHabits
 }: { 
   customHabits: CustomHabits,
   onClose: () => void,
   onAddHabit: (category: keyof CustomHabits, habit: HabitDefinition) => void,
   onUpdateHabit: (category: keyof CustomHabits, habitId: string, updates: Partial<HabitDefinition>) => void,
-  onDeleteHabit: (category: keyof CustomHabits, habitId: string) => void
+  onDeleteHabit: (category: keyof CustomHabits, habitId: string) => void,
+  onReorderHabits: (category: keyof CustomHabits, fromIndex: number, toIndex: number) => void
 }) {
   const [activeCategory, setActiveCategory] = useState<keyof CustomHabits>('business');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -5514,20 +5676,44 @@ function HabitManagerModal({
 
               {/* Habit List */}
               <div className="space-y-3">
-                {customHabits[activeCategory].map(habit => (
+                {customHabits[activeCategory].map((habit, index) => (
                   <div
                     key={habit.id}
-                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between group hover:border-purple-300 transition-all"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', index.toString());
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                      const toIndex = index;
+                      if (fromIndex !== toIndex) {
+                        onReorderHabits(activeCategory, fromIndex, toIndex);
+                      }
+                    }}
+                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between group hover:border-purple-300 transition-all cursor-move"
                   >
-                    <div className="flex-1">
-                      <div className="font-bold text-slate-800">{habit.label}</div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span className="bg-white px-2 py-1 rounded-lg border border-slate-200">
-                          {habit.type === 'number' ? '🔢 Number' : '✓ Checkbox'}
-                        </span>
-                        <span className={`font-bold ${habit.isNegative ? 'text-red-500' : 'text-green-500'}`}>
-                          {habit.isNegative ? '-' : '+'}{habit.xpValue} XP
-                        </span>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="text-slate-400 cursor-grab active:cursor-grabbing">
+                        ⋮⋮
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-slate-800">{habit.label}</div>
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                          <span className="bg-white px-2 py-1 rounded-lg border border-slate-200">
+                            {habit.type === 'number' ? '🔢 Number' : 
+                             habit.type === 'text' ? '� Text' :
+                             habit.type === 'dropdown' ? '📋 Dropdown' : '✓ Checkbox'}
+                          </span>
+                          <span className={`font-bold ${habit.isNegative ? 'text-red-500' : 'text-green-500'}`}>
+                            {habit.isNegative ? '-' : '+'}{habit.xpValue} XP
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -5575,11 +5761,13 @@ function HabitManagerModal({
                   <label className="block text-xs font-bold text-slate-600 mb-2">Type</label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'number' | 'boolean' })}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'number' | 'boolean' | 'text' | 'dropdown' })}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
                   >
                     <option value="number">Number (count/hours)</option>
                     <option value="boolean">Checkbox (yes/no)</option>
+                    <option value="text">Text Input</option>
+                    <option value="dropdown">Dropdown</option>
                   </select>
                 </div>
 
@@ -5597,9 +5785,25 @@ function HabitManagerModal({
                   <p className="text-xs text-slate-500 mt-1">
                     {formData.type === 'number' 
                       ? 'XP per unit (e.g., 20 XP per hour worked)'
-                      : 'Flat XP when checked'}
+                      : formData.type === 'text'
+                      ? 'Flat XP when text is entered'
+                      : 'Flat XP when checked/selected'}
                   </p>
                 </div>
+
+                {formData.type === 'dropdown' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-2">Dropdown Options</label>
+                    <input
+                      type="text"
+                      value={formData.options?.join(', ') || ''}
+                      onChange={(e) => setFormData({ ...formData, options: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                      placeholder="e.g., Option 1, Option 2, Option 3"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-400 focus:outline-none font-medium"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Separate options with commas</p>
+                  </div>
+                )}
 
                 {formData.type === 'number' && (
                   <>
