@@ -595,11 +595,24 @@ const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
 const getTodayISO = () => {
   // Get current date in PST/PDT (Los Angeles timezone)
   const now = new Date();
-  const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-  const year = pstDate.getFullYear();
-  const month = String(pstDate.getMonth() + 1).padStart(2, '0');
-  const day = String(pstDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  
+  // Use Intl.DateTimeFormat for more reliable timezone conversion
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  
+  const dateStr = `${year}-${month}-${day}`;
+  console.log('getTodayISO:', dateStr, 'from', now.toISOString());
+  
+  return dateStr;
 };
 
 const getWeekId = (date: Date) => {
@@ -2071,7 +2084,7 @@ export default function App() {
 
       {/* Milestone Unlock Popup */}
       <AnimatePresence>
-        {newMilestone && (
+        {newMilestone && newMilestone.pokemon && (
           <MilestonePopup 
             milestone={newMilestone.milestone}
             pokemon={newMilestone.pokemon}
