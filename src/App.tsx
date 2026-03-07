@@ -596,21 +596,28 @@ const getTodayISO = () => {
   // Get current date in PST/PDT (Los Angeles timezone)
   const now = new Date();
   
-  // Use Intl.DateTimeFormat for more reliable timezone conversion
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
+  // Convert to PST/PDT by getting UTC time and adjusting
+  // PST is UTC-8, PDT is UTC-7
+  // We'll use a more direct approach
+  const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
   
-  const parts = formatter.formatToParts(now);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
+  // Get the date components directly from the PST date
+  const year = pstDate.getFullYear();
+  const month = String(pstDate.getMonth() + 1).padStart(2, '0');
+  const day = String(pstDate.getDate()).padStart(2, '0');
   
   const dateStr = `${year}-${month}-${day}`;
-  console.log('getTodayISO:', dateStr, 'from', now.toISOString());
+  
+  console.log('Date Debug:', {
+    systemTime: now.toString(),
+    utcTime: utcDate.toString(),
+    pstTime: pstDate.toString(),
+    calculatedDate: dateStr,
+    year,
+    month,
+    day
+  });
   
   return dateStr;
 };
