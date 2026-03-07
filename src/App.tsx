@@ -911,195 +911,209 @@ export default function App() {
 
   // Calculate XP from metrics using custom habits
   const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, dateString: string) => {
-    const customHabits = playerState.customHabits;
-    
-    // Safety check - if no custom habits, return 0
-    if (!customHabits) {
-      console.error('No custom habits found in playerState');
+    try {
+      const customHabits = playerState.customHabits;
+      
+      // Safety check - if no custom habits, return 0
+      if (!customHabits) {
+        console.error('No custom habits found in playerState');
+        return 0;
+      }
+      
+      let totalXP = 0;
+
+      // Calculate XP from all custom habits
+      const allHabits = [
+        ...(customHabits.business || []),
+        ...(customHabits.health || []),
+        ...(customHabits.trainerBoosts || []),
+        ...(customHabits.statusEffects || [])
+      ];
+
+      allHabits.forEach(habit => {
+        try {
+          const value = (m as any)[habit.id];
+          
+          if (value === undefined || value === null) return;
+
+          if (habit.type === 'boolean') {
+            // Boolean: add/subtract XP if checked
+            if (value === true) {
+              totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+            }
+          } else if (habit.type === 'number') {
+            // Number: multiply value by XP per unit
+            const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+            totalXP += habit.isNegative ? -(numValue * habit.xpValue) : (numValue * habit.xpValue);
+          } else if (habit.type === 'text') {
+            // Text: add XP if text is entered
+            if (value && value.toString().trim().length > 0) {
+              totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+            }
+          } else if (habit.type === 'dropdown') {
+            // Dropdown: add XP if a value is selected (and not the first/default option)
+            if (value && habit.options && habit.options.indexOf(value) > 0) {
+              totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+            }
+          }
+        } catch (habitError) {
+          console.error(`Error calculating XP for habit ${habit.id}:`, habitError);
+        }
+      });
+
+      // Apply daily bonus
+      const seed = parseInt(dateString.replace(/-/g, '')) || 1;
+      const dailyBonus = 0.05 + ((seed % 10) / 100); 
+      totalXP *= (1 + dailyBonus);
+
+      return Math.floor(totalXP);
+    } catch (error) {
+      console.error('Error in calculateXP:', error);
       return 0;
     }
-    
-    let totalXP = 0;
-
-    // Calculate XP from all custom habits
-    const allHabits = [
-      ...(customHabits.business || []),
-      ...(customHabits.health || []),
-      ...(customHabits.trainerBoosts || []),
-      ...(customHabits.statusEffects || [])
-    ];
-
-    allHabits.forEach(habit => {
-      const value = (m as any)[habit.id];
-      
-      if (value === undefined || value === null) return;
-
-      if (habit.type === 'boolean') {
-        // Boolean: add/subtract XP if checked
-        if (value === true) {
-          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
-        }
-      } else if (habit.type === 'number') {
-        // Number: multiply value by XP per unit
-        const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-        totalXP += habit.isNegative ? -(numValue * habit.xpValue) : (numValue * habit.xpValue);
-      } else if (habit.type === 'text') {
-        // Text: add XP if text is entered
-        if (value && value.toString().trim().length > 0) {
-          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
-        }
-      } else if (habit.type === 'dropdown') {
-        // Dropdown: add XP if a value is selected (and not the first/default option)
-        if (value && habit.options && habit.options.indexOf(value) > 0) {
-          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
-        }
-      }
-    });
-
-    // Apply daily bonus
-    const seed = parseInt(dateString.replace(/-/g, '')) || 1;
-    const dailyBonus = 0.05 + ((seed % 10) / 100); 
-    totalXP *= (1 + dailyBonus);
-
-    return Math.floor(totalXP);
   };
 
   const saveMetrics = (metrics: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, date?: string) => {
-    const targetDate = date || getTodayISO();
-    const newXP = calculateXP(metrics, targetDate);
+    try {
+      const targetDate = date || getTodayISO();
+      const newXP = calculateXP(metrics, targetDate);
 
-    const updatedMetrics: DailyMetrics = {
-      ...metrics,
-      date: targetDate,
-      xpEarned: newXP,
-      claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
-    };
+      const updatedMetrics: DailyMetrics = {
+        ...metrics,
+        date: targetDate,
+        xpEarned: newXP,
+        claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
+      };
 
-    // Update daily metrics first
-    const newDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
-    setDailyMetrics(newDailyMetrics);
-    
-    // Calculate total XP from ALL days (this is the source of truth)
-    const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
-    const oldTotalXP = playerState.totalXP;
-    const totalXPDiff = newTotalXP - oldTotalXP;
-    
-    // Update player's total XP to match the sum of all daily XP
-    setPlayerState(prevPlayer => {
-      const newLevel = getLevel(newTotalXP);
+      // Update daily metrics first
+      const newDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
+      setDailyMetrics(newDailyMetrics);
       
-      let newEggs = [...prevPlayer.eggs];
-      if (newLevel > prevPlayer.level) {
-        // Give an egg based on level
-        const rarity = newLevel >= 21 ? 'legendary' : 
-                        newLevel >= 13 ? 'epic' : 
-                        newLevel >= 6 ? 'rare' : 'uncommon';
+      // Calculate total XP from ALL days (this is the source of truth)
+      const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
+      const oldTotalXP = playerState.totalXP;
+      const totalXPDiff = newTotalXP - oldTotalXP;
+      
+      // Update player's total XP to match the sum of all daily XP
+      setPlayerState(prevPlayer => {
+        const newLevel = getLevel(newTotalXP);
         
-        const levelEgg: Egg = {
+        let newEggs = [...prevPlayer.eggs];
+        if (newLevel > prevPlayer.level) {
+          // Give an egg based on level
+          const rarity = newLevel >= 21 ? 'legendary' : 
+                          newLevel >= 13 ? 'epic' : 
+                          newLevel >= 6 ? 'rare' : 'uncommon';
+          
+          const levelEgg: Egg = {
+            id: Math.random().toString(36).substr(2, 9),
+            rarity,
+            obtainedAt: new Date().toISOString(),
+            source: 'level'
+          };
+          
+          newEggs = [levelEgg, ...newEggs];
+          setNewDrop({ egg: levelEgg });
+        }
+        
+        return {
+          ...prevPlayer,
+          totalXP: newTotalXP,
+          level: newLevel,
+          eggs: newEggs
+        };
+      });
+      
+      // Show animation for XP change
+      if (totalXPDiff !== 0) {
+        setShowXPGain(totalXPDiff);
+      }
+      
+      // Check for milestone unlocks
+      const unlockedMilestones = playerState.unlockedMilestones || [];
+      const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
+      
+      if (newlyUnlocked.length > 0) {
+        // Unlock the first new milestone - give an egg
+        const milestone = newlyUnlocked[0];
+        
+        const milestoneEgg: Egg = {
           id: Math.random().toString(36).substr(2, 9),
-          rarity,
+          rarity: milestone.reward.rarity,
           obtainedAt: new Date().toISOString(),
-          source: 'level'
+          source: 'milestone'
         };
         
-        newEggs = [levelEgg, ...newEggs];
-        setNewDrop({ egg: levelEgg });
+        setPlayerState(prev => ({
+          ...prev,
+          eggs: [milestoneEgg, ...prev.eggs],
+          unlockedMilestones: [
+            ...(prev.unlockedMilestones || []),
+            {
+              milestoneId: milestone.id,
+              unlockedAt: new Date().toISOString(),
+              pokemon: null as any // Will be filled when egg is hatched
+            }
+          ]
+        }));
+        
+        setNewMilestone({ milestone, pokemon: null as any });
+        setNewDrop({ egg: milestoneEgg });
       }
       
-      return {
-        ...prevPlayer,
-        totalXP: newTotalXP,
-        level: newLevel,
-        eggs: newEggs
-      };
-    });
-    
-    // Show animation for XP change
-    if (totalXPDiff !== 0) {
-      setShowXPGain(totalXPDiff);
-    }
-    
-    // Check for milestone unlocks
-    const unlockedMilestones = playerState.unlockedMilestones || [];
-    const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
-    
-    if (newlyUnlocked.length > 0) {
-      // Unlock the first new milestone - give an egg
-      const milestone = newlyUnlocked[0];
+      // Check for daily egg reward (>2 hours of work)
+      const lastClaim = playerState.lastDailyEggClaim;
+      const canClaimToday = lastClaim !== targetDate;
+      const workedEnough = metrics.workHours >= 2;
       
-      const milestoneEgg: Egg = {
-        id: Math.random().toString(36).substr(2, 9),
-        rarity: milestone.reward.rarity,
-        obtainedAt: new Date().toISOString(),
-        source: 'milestone'
-      };
+      if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
+        // Give daily egg reward
+        const dailyEgg: Egg = {
+          id: Math.random().toString(36).substr(2, 9),
+          rarity: 'rare', // Daily reward is always rare
+          obtainedAt: new Date().toISOString(),
+          source: 'daily'
+        };
+        
+        setPlayerState(prev => ({
+          ...prev,
+          eggs: [dailyEgg, ...prev.eggs],
+          lastDailyEggClaim: targetDate
+        }));
+        
+        setNewDrop({ egg: dailyEgg });
+      }
       
-      setPlayerState(prev => ({
-        ...prev,
-        eggs: [milestoneEgg, ...prev.eggs],
-        unlockedMilestones: [
-          ...(prev.unlockedMilestones || []),
-          {
-            milestoneId: milestone.id,
-            unlockedAt: new Date().toISOString(),
-            pokemon: null as any // Will be filled when egg is hatched
+      // Auto-sync if enabled
+      if (syncSettings.autoSync && syncSettings.sheetUrl) {
+        syncAllData(newDailyMetrics, tasks, syncSettings.sheetUrl).then(result => {
+          if (result.success) {
+            setSyncStatus('✓ Synced');
+            setTimeout(() => setSyncStatus(''), 2000);
           }
-        ]
-      }));
-      
-      setNewMilestone({ milestone, pokemon: null as any });
-      setNewDrop({ egg: milestoneEgg });
-    }
-    
-    // Check for daily egg reward (>2 hours of work)
-    const lastClaim = playerState.lastDailyEggClaim;
-    const canClaimToday = lastClaim !== targetDate;
-    const workedEnough = metrics.workHours >= 2;
-    
-    if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
-      // Give daily egg reward
-      const dailyEgg: Egg = {
-        id: Math.random().toString(36).substr(2, 9),
-        rarity: 'rare', // Daily reward is always rare
-        obtainedAt: new Date().toISOString(),
-        source: 'daily'
-      };
-      
-      setPlayerState(prev => ({
-        ...prev,
-        eggs: [dailyEgg, ...prev.eggs],
-        lastDailyEggClaim: targetDate
-      }));
-      
-      setNewDrop({ egg: dailyEgg });
-    }
-    
-    // Auto-sync if enabled
-    if (syncSettings.autoSync && syncSettings.sheetUrl) {
-      syncAllData(newDailyMetrics, tasks, syncSettings.sheetUrl).then(result => {
-        if (result.success) {
-          setSyncStatus('✓ Synced');
-          setTimeout(() => setSyncStatus(''), 2000);
-        }
-      });
-    }
-    
-    // Only apply boss damage if the log is for the current week and XP increased
-    const oldXP = dailyMetrics[targetDate]?.xpEarned || 0;
-    const xpDiff = newXP - oldXP;
-    if (xpDiff > 0) {
-      const currentWeek = getWeekId(new Date());
-      const targetWeek = getWeekId(new Date(targetDate));
-      if (currentWeek === targetWeek) {
-        applyBossDamage(metrics, xpDiff);
+        });
       }
       
-      // Check for threshold drop (every 80 XP)
+      // Only apply boss damage if the log is for the current week and XP increased
+      const oldXP = dailyMetrics[targetDate]?.xpEarned || 0;
+      const xpDiff = newXP - oldXP;
+      if (xpDiff > 0) {
+        const currentWeek = getWeekId(new Date());
+        const targetWeek = getWeekId(new Date(targetDate));
+        if (currentWeek === targetWeek) {
+          applyBossDamage(metrics, xpDiff);
+        }
+        
+        // Check for threshold drop (every 80 XP)
       const oldThresholds = Math.floor(oldXP / 80);
       const newThresholds = Math.floor(newXP / 80);
       if (newThresholds > oldThresholds) {
         rollDrop();
       }
+    }
+    } catch (error) {
+      console.error('Error in saveMetrics:', error);
+      alert('Failed to save metrics. Please try again or reload the page. Error: ' + (error as Error).message);
     }
   };
 
@@ -5272,11 +5286,39 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
       try {
         const data = JSON.parse(event.target?.result as string);
         
-        // Parse the stringified data before setting to localStorage
+        // Parse and validate playerState
         if (data.playerState) {
-          const playerData = typeof data.playerState === 'string' ? data.playerState : JSON.stringify(data.playerState);
-          localStorage.setItem('synthPoke_playerState', playerData);
+          let playerData = typeof data.playerState === 'string' ? JSON.parse(data.playerState) : data.playerState;
+          
+          // Ensure customHabits exists with defaults
+          if (!playerData.customHabits) {
+            playerData.customHabits = {
+              business: DEFAULT_BUSINESS_HABITS,
+              health: DEFAULT_HEALTH_HABITS,
+              trainerBoosts: DEFAULT_TRAINER_BOOSTS,
+              statusEffects: DEFAULT_STATUS_EFFECTS
+            };
+          }
+          
+          // Ensure categoryVisibility exists
+          if (!playerData.categoryVisibility) {
+            playerData.categoryVisibility = {
+              business: true,
+              health: true,
+              trainerBoosts: true,
+              statusEffects: true
+            };
+          }
+          
+          // Ensure unlockedMilestones exists
+          if (!playerData.unlockedMilestones) {
+            playerData.unlockedMilestones = [];
+          }
+          
+          localStorage.setItem('synthPoke_playerState', JSON.stringify(playerData));
         }
+        
+        // Parse other data
         if (data.dailyMetrics) {
           const metricsData = typeof data.dailyMetrics === 'string' ? data.dailyMetrics : JSON.stringify(data.dailyMetrics);
           localStorage.setItem('synthPoke_dailyMetrics', metricsData);
@@ -5289,15 +5331,20 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
           const bossData = typeof data.weeklyBoss === 'string' ? data.weeklyBoss : JSON.stringify(data.weeklyBoss);
           localStorage.setItem('synthPoke_weeklyBoss', bossData);
         }
+        if (data.bosses) {
+          const bossesData = typeof data.bosses === 'string' ? data.bosses : JSON.stringify(data.bosses);
+          localStorage.setItem('synthPoke_bosses', bossesData);
+        }
         if (data.tasks) {
           const tasksData = typeof data.tasks === 'string' ? data.tasks : JSON.stringify(data.tasks);
           localStorage.setItem('synthPoke_tasks', tasksData);
         }
         
+        // Force immediate reload to ensure state is properly initialized
         window.location.reload();
       } catch (err) {
         console.error('Import error:', err);
-        alert('Failed to import data. Invalid file format.');
+        alert('Failed to import data. Invalid file format. Error: ' + (err as Error).message);
       }
     };
     reader.readAsText(file);
