@@ -190,8 +190,9 @@ export function listenToCloudUpdates(
 // Check if Firebase is configured
 export function isFirebaseConfigured(): boolean {
   try {
-    return auth.app.options.apiKey !== 'YOUR_API_KEY';
-  } catch {
+    return auth && auth.app && auth.app.options && auth.app.options.apiKey && auth.app.options.apiKey !== 'YOUR_API_KEY';
+  } catch (error) {
+    console.warn('Firebase check error:', error);
     return false;
   }
 }

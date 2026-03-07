@@ -864,66 +864,79 @@ export default function App() {
 
   // Cloud sync - Listen to auth changes
   useEffect(() => {
-    if (!isFirebaseConfigured()) return;
-    
-    const unsubscribe = onAuthChange((user) => {
-      setCloudUser(user);
-      if (user) {
-        setCloudStatus(`Signed in as ${user.displayName || user.email}`);
-        // Load data from cloud when signing in
-        loadFromCloud().then(result => {
-          if (result.success && result.data) {
-            const shouldRestore = confirm(
-              'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
-              `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
-              'Click OK to restore, or Cancel to keep local data.'
-            );
-            
-            if (shouldRestore) {
-              setPlayerState(result.data.playerState);
-              setDailyMetrics(result.data.dailyMetrics);
-              setQuests(result.data.quests);
-              setWeeklyBoss(result.data.weeklyBoss);
-              setTasks(result.data.tasks);
-              setBosses(result.data.bosses || []);
-              setCloudStatus('✓ Restored from cloud');
-              setTimeout(() => setCloudStatus(''), 3000);
+    try {
+      if (!isFirebaseConfigured()) return;
+      
+      const unsubscribe = onAuthChange((user) => {
+        setCloudUser(user);
+        if (user) {
+          setCloudStatus(`Signed in as ${user.displayName || user.email}`);
+          // Load data from cloud when signing in
+          loadFromCloud().then(result => {
+            if (result.success && result.data) {
+              const shouldRestore = confirm(
+                'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
+                `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
+                'Click OK to restore, or Cancel to keep local data.'
+              );
+              
+              if (shouldRestore) {
+                setPlayerState(result.data.playerState);
+                setDailyMetrics(result.data.dailyMetrics);
+                setQuests(result.data.quests);
+                setWeeklyBoss(result.data.weeklyBoss);
+                setTasks(result.data.tasks);
+                setBosses(result.data.bosses || []);
+                setCloudStatus('✓ Restored from cloud');
+                setTimeout(() => setCloudStatus(''), 3000);
+              }
             }
-          }
-        });
-      } else {
-        setCloudStatus('');
-      }
-    });
-    
-    return unsubscribe;
+          }).catch(error => {
+            console.error('Cloud load error:', error);
+          });
+        } else {
+          setCloudStatus('');
+        }
+      });
+      
+      return unsubscribe;
+    } catch (error) {
+      console.error('Cloud sync setup error:', error);
+      return () => {};
+    }
   }, []);
 
   // Auto cloud sync
   useEffect(() => {
-    if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
-    if (isResettingRef.current) return;
-    
-    const timeoutId = setTimeout(() => {
-      const cloudData: CloudData = {
-        playerState,
-        dailyMetrics,
-        quests,
-        weeklyBoss,
-        tasks,
-        bosses,
-        lastUpdated: new Date().toISOString()
-      };
+    try {
+      if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
+      if (isResettingRef.current) return;
       
-      saveToCloud(cloudData).then(result => {
-        if (result.success) {
-          setCloudStatus('☁️ Synced');
-          setTimeout(() => setCloudStatus(''), 2000);
-        }
-      });
-    }, 2000); // Debounce 2 seconds
-    
-    return () => clearTimeout(timeoutId);
+      const timeoutId = setTimeout(() => {
+        const cloudData: CloudData = {
+          playerState,
+          dailyMetrics,
+          quests,
+          weeklyBoss,
+          tasks,
+          bosses,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        saveToCloud(cloudData).then(result => {
+          if (result.success) {
+            setCloudStatus('☁️ Synced');
+            setTimeout(() => setCloudStatus(''), 2000);
+          }
+        }).catch(error => {
+          console.error('Auto sync error:', error);
+        });
+      }, 2000); // Debounce 2 seconds
+      
+      return () => clearTimeout(timeoutId);
+    } catch (error) {
+      console.error('Auto sync setup error:', error);
+    }
   }, [playerState, dailyMetrics, quests, weeklyBoss, tasks, bosses, cloudUser, autoCloudSync]);
 
   // --- Initialization & Resets ---
