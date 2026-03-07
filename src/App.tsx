@@ -714,7 +714,8 @@ export default function App() {
   const [cloudUser, setCloudUser] = useState<User | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string>('');
   const [autoCloudSync, setAutoCloudSync] = useState(() => {
-    return localStorage.getItem('autoCloudSync') === 'true';
+    const saved = localStorage.getItem('autoCloudSync');
+    return saved === null ? true : saved === 'true'; // Default to true
   });
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
@@ -870,24 +871,34 @@ export default function App() {
       setCloudUser(user);
       if (user) {
         setCloudStatus(`Signed in as ${user.displayName || user.email}`);
-        // Load data from cloud when signing in
+        // Automatically load and merge with cloud data
         loadFromCloud().then(result => {
           if (result.success && result.data) {
-            const shouldRestore = confirm(
-              'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
-              `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
-              'Click OK to restore, or Cancel to keep local data.'
-            );
+            const cloudTime = new Date(result.data.lastUpdated).getTime();
+            const localTime = new Date(localStorage.getItem('lastLocalUpdate') || 0).getTime();
             
-            if (shouldRestore) {
+            // Use whichever data is more recent
+            if (cloudTime > localTime) {
               setPlayerState(result.data.playerState);
               setDailyMetrics(result.data.dailyMetrics);
               setQuests(result.data.quests);
               setWeeklyBoss(result.data.weeklyBoss);
               setTasks(result.data.tasks);
               setBosses(result.data.bosses || []);
-              setCloudStatus('✓ Restored from cloud');
-              setTimeout(() => setCloudStatus(''), 3000);
+              setCloudStatus('✓ Synced from cloud');
+              setTimeout(() => setCloudStatus(''), 2000);
+            } else if (localTime > cloudTime) {
+              // Local is newer, push to cloud immediately
+              const cloudData: CloudData = {
+                playerState,
+                dailyMetrics,
+                quests,
+                weeklyBoss,
+                tasks,
+                bosses,
+                lastUpdated: new Date().toISOString()
+              };
+              saveToCloud(cloudData);
             }
           }
         });
@@ -899,7 +910,7 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Auto cloud sync
+  // Auto cloud sync - more frequent updates
   useEffect(() => {
     if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
     if (isResettingRef.current) return;
@@ -915,13 +926,16 @@ export default function App() {
         lastUpdated: new Date().toISOString()
       };
       
+      // Update local timestamp
+      localStorage.setItem('lastLocalUpdate', new Date().toISOString());
+      
       saveToCloud(cloudData).then(result => {
         if (result.success) {
-          setCloudStatus('☁️ Synced');
-          setTimeout(() => setCloudStatus(''), 2000);
+          setCloudStatus('☁️');
+          setTimeout(() => setCloudStatus(''), 1000);
         }
       });
-    }, 2000); // Debounce 2 seconds
+    }, 500); // Faster debounce - 500ms instead of 2s
     
     return () => clearTimeout(timeoutId);
   }, [playerState, dailyMetrics, quests, weeklyBoss, tasks, bosses, cloudUser, autoCloudSync]);
@@ -5792,12 +5806,12 @@ function HistoryTab({
           )}
 
           <div className="bg-white/50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
-            <div className="font-bold">✨ Benefits:</div>
+            <div className="font-bold">✨ How it works:</div>
             <ul className="list-disc list-inside space-y-1 text-[11px]">
-              <li>Access your data from any device</li>
-              <li>Automatic real-time sync</li>
-              <li>Never lose your progress</li>
-              <li>Free with Google account</li>
+              <li>Syncs automatically every 500ms after changes</li>
+              <li>Always uses the most recent data</li>
+              <li>Works seamlessly across all devices</li>
+              <li>No prompts - just works!</li>
             </ul>
           </div>
         </div>
