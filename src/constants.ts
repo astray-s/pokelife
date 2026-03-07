@@ -4,6 +4,7 @@ import { Pokemon, Quest, HabitDefinition } from './types';
 export const DEFAULT_BUSINESS_HABITS: HabitDefinition[] = [
   { id: 'workHours', label: 'Hours Worked', type: 'number', xpValue: 20, step: '0.5', sprite: 68 },
   { id: 'discoveryCalls', label: 'Discovery Calls', type: 'number', xpValue: 40, sprite: 81 },
+  { id: 'deliveryCalls', label: 'Delivery Calls', type: 'number', xpValue: 35, sprite: 242 },
   { id: 'networkingCalls', label: 'Networking Calls', type: 'number', xpValue: 30, sprite: 441 },
   { id: 'salesCalls', label: 'Sales Calls', type: 'number', xpValue: 50, sprite: 52 },
   { id: 'firstDmsSent', label: 'First DMs Sent', type: 'number', xpValue: 10, sprite: 16 },
@@ -12,8 +13,6 @@ export const DEFAULT_BUSINESS_HABITS: HabitDefinition[] = [
   { id: 'postsCreated', label: 'Posts Created', type: 'number', xpValue: 20, sprite: 235 },
   { id: 'postsPosted', label: 'Posts Posted', type: 'number', xpValue: 30, sprite: 149 },
   { id: 'callsBooked', label: 'Calls Booked', type: 'number', xpValue: 50, sprite: 113 },
-  { id: 'callsTaken', label: 'Calls Taken', type: 'number', xpValue: 25, sprite: 242 },
-  { id: 'totalDmsSent', label: 'Total DMs Sent', type: 'number', xpValue: 2, sprite: 225 },
 ];
 
 export const DEFAULT_HEALTH_HABITS: HabitDefinition[] = [
@@ -30,7 +29,6 @@ export const DEFAULT_TRAINER_BOOSTS: HabitDefinition[] = [
   { id: 'visualizations', label: 'Visualizations', type: 'boolean', xpValue: 15, sprite: 96 },
   { id: 'planTomorrow', label: 'Plan Tomorrow', type: 'boolean', xpValue: 15, sprite: 233 },
   { id: 'storyList', label: 'Story List', type: 'boolean', xpValue: 15, sprite: 83 },
-  { id: 'journal', label: 'Journal', type: 'boolean', xpValue: 20, sprite: 102 },
 ];
 
 export const DEFAULT_STATUS_EFFECTS: HabitDefinition[] = [
@@ -191,12 +189,12 @@ export const MINI_BOSS_NAMES = MINI_BOSS_DATA.map(b => b.name);
 
 export const METRIC_KEYS = [
   // Main Attacks (Business)
-  'workHours', 'discoveryCalls', 'networkingCalls', 'salesCalls', 'firstDmsSent', 'followUpsSent', 
-  'commentingMinutes', 'postsCreated', 'postsPosted', 'callsBooked', 'callsTaken', 'totalDmsSent',
+  'workHours', 'discoveryCalls', 'deliveryCalls', 'networkingCalls', 'salesCalls', 'firstDmsSent', 'followUpsSent', 
+  'commentingMinutes', 'postsCreated', 'postsPosted', 'callsBooked',
   // Special Moves (Health)
   'timeAsleep', 'timeAwake', 'coldShowers', 'fastHours', 'exerciseType', 'foodTracking',
   // Trainer Boosts (Daily Habits)
-  'affirmations', 'visualizations', 'planTomorrow', 'storyList', 'journal',
+  'affirmations', 'visualizations', 'planTomorrow', 'storyList',
   // Status Effects (Bad Habits)
   'youtube', 'reels', 'shorts', 'processedFood', 'gaming'
 ] as const;

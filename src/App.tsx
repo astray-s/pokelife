@@ -1067,7 +1067,8 @@ export default function App() {
           ]
         }));
         
-        setNewMilestone({ milestone, pokemon: null as any });
+        // Don't show milestone popup - just show the egg drop
+        // setNewMilestone({ milestone, pokemon: null as any });
         setNewDrop({ egg: milestoneEgg });
       }
       
