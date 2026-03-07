@@ -610,78 +610,6 @@ const getWeekId = (date: Date) => {
   return `${d.getFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 };
 
-const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, dateString: string) => {
-  // MAIN ATTACKS (Business & Work) - Highest weightage
-  let businessXP = m.workHours * 20 + 
-                   m.discoveryCalls * 40 + 
-                   m.networkingCalls * 30 + 
-                   m.salesCalls * 50 + 
-                   m.firstDmsSent * 10 + 
-                   m.followUpsSent * 10 + 
-                   m.commentingMinutes * 2 + 
-                   m.postsCreated * 20 + 
-                   m.postsPosted * 30 + 
-                   m.callsBooked * 50 + 
-                   m.callsTaken * 25 + 
-                   m.totalDmsSent * 2;
-  
-  // SPECIAL MOVES (Health & Vitality) - Medium weightage
-  let healthXP = 0;
-  
-  // Sleep quality (goal: asleep by 9 PM = 21:00, awake by 5 AM = 05:00)
-  // Parse time strings (HH:MM format)
-  const parseTime = (timeStr: string) => {
-    if (!timeStr) return 999; // Invalid time returns high number
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours + (minutes / 60);
-  };
-  
-  const asleepTime = parseTime(m.timeAsleep);
-  const awakeTime = parseTime(m.timeAwake);
-  
-  if (asleepTime <= 21) healthXP += 30; // Bonus for sleeping by 9 PM
-  if (awakeTime <= 5) healthXP += 30; // Bonus for waking by 5 AM
-  
-  healthXP += m.coldShowers * 15; // Cold showers
-  healthXP += m.fastHours * 3; // Fasting
-  
-  // Exercise - 60 XP for any exercise type
-  if (m.exerciseType && m.exerciseType !== 'none') {
-    healthXP += 60;
-  }
-  
-  healthXP += m.foodTracking ? 25 : 0; // Food tracking
-  
-  // TRAINER BOOSTS (Daily Habits) - Lower weightage
-  let habitsXP = 0;
-  habitsXP += m.affirmations ? 15 : 0;
-  habitsXP += m.visualizations ? 15 : 0;
-  habitsXP += m.planTomorrow ? 15 : 0;
-  habitsXP += m.storyList ? 15 : 0;
-  habitsXP += m.journal ? 20 : 0;
-  
-  // Total positive XP
-  let totalBase = businessXP + healthXP + habitsXP;
-
-  // Apply daily bonus
-  const seed = parseInt(dateString.replace(/-/g, '')) || 1;
-  const dailyBonus = 0.05 + ((seed % 10) / 100); 
-  totalBase *= (1 + dailyBonus);
-
-  // STATUS EFFECTS (Bad Habits) - Subtract fixed XP amounts
-  let statusPenalty = 0;
-  if (m.youtube) statusPenalty += 30; // -30 XP
-  if (m.reels) statusPenalty += 30; // -30 XP
-  if (m.shorts) statusPenalty += 30; // -30 XP
-  if (m.processedFood) statusPenalty += 25; // -25 XP
-  if (m.gaming) statusPenalty += 40; // -40 XP
-  
-  // Subtract penalty from total
-  totalBase -= statusPenalty;
-
-  return Math.floor(totalBase);
-};
-
 const getLevel = (totalXP: number) => Math.floor(Math.sqrt(totalXP / 150));
 const getXPForLevel = (level: number) => level * level * 150;
 
@@ -975,6 +903,54 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(getTodayISO());
 
   // --- Actions ---
+
+  // Calculate XP from metrics using custom habits
+  const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, dateString: string) => {
+    const customHabits = playerState.customHabits!;
+    let totalXP = 0;
+
+    // Calculate XP from all custom habits
+    const allHabits = [
+      ...customHabits.business,
+      ...customHabits.health,
+      ...customHabits.trainerBoosts,
+      ...customHabits.statusEffects
+    ];
+
+    allHabits.forEach(habit => {
+      const value = (m as any)[habit.id];
+      
+      if (value === undefined || value === null) return;
+
+      if (habit.type === 'boolean') {
+        // Boolean: add/subtract XP if checked
+        if (value === true) {
+          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+        }
+      } else if (habit.type === 'number') {
+        // Number: multiply value by XP per unit
+        const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+        totalXP += habit.isNegative ? -(numValue * habit.xpValue) : (numValue * habit.xpValue);
+      } else if (habit.type === 'text') {
+        // Text: add XP if text is entered
+        if (value && value.toString().trim().length > 0) {
+          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+        }
+      } else if (habit.type === 'dropdown') {
+        // Dropdown: add XP if a value is selected (and not the first/default option)
+        if (value && habit.options && habit.options.indexOf(value) > 0) {
+          totalXP += habit.isNegative ? -habit.xpValue : habit.xpValue;
+        }
+      }
+    });
+
+    // Apply daily bonus
+    const seed = parseInt(dateString.replace(/-/g, '')) || 1;
+    const dailyBonus = 0.05 + ((seed % 10) / 100); 
+    totalXP *= (1 + dailyBonus);
+
+    return Math.floor(totalXP);
+  };
 
   const saveMetrics = (metrics: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, date?: string) => {
     const targetDate = date || getTodayISO();
