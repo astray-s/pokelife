@@ -5300,14 +5300,27 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
       dailyMetrics: localStorage.getItem('synthPoke_dailyMetrics'),
       quests: localStorage.getItem('synthPoke_quests'),
       weeklyBoss: localStorage.getItem('synthPoke_weeklyBoss'),
+      bosses: localStorage.getItem('synthPoke_bosses'),
       tasks: localStorage.getItem('synthPoke_tasks'),
+      exportDate: new Date().toISOString(),
+      version: '2.0'
     };
-    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    
+    console.log('Exporting data:', {
+      hasPlayerState: !!data.playerState,
+      hasMetrics: !!data.dailyMetrics,
+      hasQuests: !!data.quests,
+      hasBosses: !!data.bosses,
+      hasTasks: !!data.tasks
+    });
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `pokelife-backup-${getTodayISO()}.json`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -5318,18 +5331,44 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
       try {
         const data = JSON.parse(event.target?.result as string);
         
+        console.log('Importing data:', {
+          hasPlayerState: !!data.playerState,
+          hasMetrics: !!data.dailyMetrics,
+          hasQuests: !!data.quests,
+          hasBosses: !!data.bosses,
+          hasTasks: !!data.tasks,
+          version: data.version
+        });
+        
         // Parse and validate playerState
         if (data.playerState) {
           let playerData = typeof data.playerState === 'string' ? JSON.parse(data.playerState) : data.playerState;
           
-          // Ensure customHabits exists with defaults
+          console.log('PlayerState before migration:', {
+            hasCustomHabits: !!playerData.customHabits,
+            hasCategoryVisibility: !!playerData.categoryVisibility,
+            hasUnlockedMilestones: !!playerData.unlockedMilestones,
+            hasEggs: !!playerData.eggs,
+            eggsCount: playerData.eggs?.length || 0,
+            monstersCount: playerData.monstersOwned?.length || 0
+          });
+          
+          // Ensure customHabits exists - if it does, keep user's custom habits!
           if (!playerData.customHabits) {
+            console.log('No customHabits found, adding defaults');
             playerData.customHabits = {
               business: DEFAULT_BUSINESS_HABITS,
               health: DEFAULT_HEALTH_HABITS,
               trainerBoosts: DEFAULT_TRAINER_BOOSTS,
               statusEffects: DEFAULT_STATUS_EFFECTS
             };
+          } else {
+            console.log('CustomHabits found, preserving user habits:', {
+              businessCount: playerData.customHabits.business?.length || 0,
+              healthCount: playerData.customHabits.health?.length || 0,
+              trainerBoostsCount: playerData.customHabits.trainerBoosts?.length || 0,
+              statusEffectsCount: playerData.customHabits.statusEffects?.length || 0
+            });
           }
           
           // Ensure categoryVisibility exists
@@ -5347,30 +5386,48 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
             playerData.unlockedMilestones = [];
           }
           
+          // Ensure eggs array exists
+          if (!playerData.eggs) {
+            playerData.eggs = [];
+          }
+          
+          // Ensure monstersOwned array exists
+          if (!playerData.monstersOwned) {
+            playerData.monstersOwned = [];
+          }
+          
           localStorage.setItem('synthPoke_playerState', JSON.stringify(playerData));
+          console.log('PlayerState saved to localStorage');
         }
         
         // Parse other data
         if (data.dailyMetrics) {
           const metricsData = typeof data.dailyMetrics === 'string' ? data.dailyMetrics : JSON.stringify(data.dailyMetrics);
           localStorage.setItem('synthPoke_dailyMetrics', metricsData);
+          console.log('DailyMetrics saved');
         }
         if (data.quests) {
           const questsData = typeof data.quests === 'string' ? data.quests : JSON.stringify(data.quests);
           localStorage.setItem('synthPoke_quests', questsData);
+          console.log('Quests saved');
         }
         if (data.weeklyBoss) {
           const bossData = typeof data.weeklyBoss === 'string' ? data.weeklyBoss : JSON.stringify(data.weeklyBoss);
           localStorage.setItem('synthPoke_weeklyBoss', bossData);
+          console.log('WeeklyBoss saved');
         }
         if (data.bosses) {
           const bossesData = typeof data.bosses === 'string' ? data.bosses : JSON.stringify(data.bosses);
           localStorage.setItem('synthPoke_bosses', bossesData);
+          console.log('Bosses saved');
         }
         if (data.tasks) {
           const tasksData = typeof data.tasks === 'string' ? data.tasks : JSON.stringify(data.tasks);
           localStorage.setItem('synthPoke_tasks', tasksData);
+          console.log('Tasks saved');
         }
+        
+        console.log('Import complete, reloading page...');
         
         // Force immediate reload to ensure state is properly initialized
         window.location.reload();

@@ -72,10 +72,19 @@ export async function saveToCloud(
 
     console.log('Data to sync:', {
       playerStateKeys: Object.keys(playerState),
+      hasCustomHabits: !!playerState.customHabits,
+      customHabitsCount: playerState.customHabits ? {
+        business: playerState.customHabits.business?.length || 0,
+        health: playerState.customHabits.health?.length || 0,
+        trainerBoosts: playerState.customHabits.trainerBoosts?.length || 0,
+        statusEffects: playerState.customHabits.statusEffects?.length || 0
+      } : 'none',
       metricsCount: Object.keys(dailyMetrics).length,
       questsCount: quests.length,
       bossesCount: bosses.length,
-      tasksCount: tasks.length
+      tasksCount: tasks.length,
+      eggsCount: playerState.eggs?.length || 0,
+      monstersCount: playerState.monstersOwned?.length || 0
     });
 
     // Clean undefined values before saving to Firebase
