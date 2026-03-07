@@ -69,18 +69,6 @@ import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToCli
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
 import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
-import { 
-  signUpWithEmail,
-  signInWithEmail,
-  signOut as cloudSignOut, 
-  getCurrentUser, 
-  onAuthChange,
-  saveToCloud,
-  loadFromCloud,
-  isFirebaseConfigured,
-  CloudData
-} from './cloudSync';
-import type { User } from 'firebase/auth';
 
 // --- Pokemon-themed Animation Components ---
 
@@ -711,11 +699,6 @@ export default function App() {
   const [shareCardStats, setShareCardStats] = useState<WeeklyStats | null>(null);
   const [backupStatus, setBackupStatus] = useState<string>('');
   const [showBackupSettings, setShowBackupSettings] = useState(false);
-  const [cloudUser, setCloudUser] = useState<User | null>(null);
-  const [cloudStatus, setCloudStatus] = useState<string>('');
-  const [autoCloudSync, setAutoCloudSync] = useState(() => {
-    return localStorage.getItem('autoCloudSync') === 'true';
-  });
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -861,83 +844,6 @@ export default function App() {
       return () => clearTimeout(timeoutId);
     }
   }, [playerState, dailyMetrics, quests, weeklyBoss, tasks]);
-
-  // Cloud sync - Listen to auth changes
-  useEffect(() => {
-    try {
-      if (!isFirebaseConfigured()) return;
-      
-      const unsubscribe = onAuthChange((user) => {
-        setCloudUser(user);
-        if (user) {
-          setCloudStatus(`Signed in as ${user.displayName || user.email}`);
-          // Load data from cloud when signing in
-          loadFromCloud().then(result => {
-            if (result.success && result.data) {
-              const shouldRestore = confirm(
-                'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
-                `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
-                'Click OK to restore, or Cancel to keep local data.'
-              );
-              
-              if (shouldRestore) {
-                setPlayerState(result.data.playerState);
-                setDailyMetrics(result.data.dailyMetrics);
-                setQuests(result.data.quests);
-                setWeeklyBoss(result.data.weeklyBoss);
-                setTasks(result.data.tasks);
-                setBosses(result.data.bosses || []);
-                setCloudStatus('✓ Restored from cloud');
-                setTimeout(() => setCloudStatus(''), 3000);
-              }
-            }
-          }).catch(error => {
-            console.error('Cloud load error:', error);
-          });
-        } else {
-          setCloudStatus('');
-        }
-      });
-      
-      return unsubscribe;
-    } catch (error) {
-      console.error('Cloud sync setup error:', error);
-      return () => {};
-    }
-  }, []);
-
-  // Auto cloud sync
-  useEffect(() => {
-    try {
-      if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
-      if (isResettingRef.current) return;
-      
-      const timeoutId = setTimeout(() => {
-        const cloudData: CloudData = {
-          playerState,
-          dailyMetrics,
-          quests,
-          weeklyBoss,
-          tasks,
-          bosses,
-          lastUpdated: new Date().toISOString()
-        };
-        
-        saveToCloud(cloudData).then(result => {
-          if (result.success) {
-            setCloudStatus('☁️ Synced');
-            setTimeout(() => setCloudStatus(''), 2000);
-          }
-        }).catch(error => {
-          console.error('Auto sync error:', error);
-        });
-      }, 2000); // Debounce 2 seconds
-      
-      return () => clearTimeout(timeoutId);
-    } catch (error) {
-      console.error('Auto sync setup error:', error);
-    }
-  }, [playerState, dailyMetrics, quests, weeklyBoss, tasks, bosses, cloudUser, autoCloudSync]);
 
   // --- Initialization & Resets ---
   useEffect(() => {
@@ -1478,85 +1384,6 @@ export default function App() {
     });
   };
 
-  // Cloud Sync Functions
-  const handleCloudSignUp = async (email: string, password: string) => {
-    setCloudStatus('Creating account...');
-    const result = await signUpWithEmail(email, password);
-    setCloudStatus(result.message);
-    setTimeout(() => setCloudStatus(''), 3000);
-    return result.success;
-  };
-
-  const handleCloudSignIn = async (email: string, password: string) => {
-    setCloudStatus('Signing in...');
-    const result = await signInWithEmail(email, password);
-    if (!result.success) {
-      setCloudStatus(result.message);
-      setTimeout(() => setCloudStatus(''), 3000);
-    }
-    return result.success;
-  };
-
-  const handleCloudSignOut = async () => {
-    const result = await cloudSignOut();
-    setCloudStatus(result.message);
-    setTimeout(() => setCloudStatus(''), 3000);
-  };
-
-  const handleManualCloudSync = async () => {
-    if (!cloudUser) {
-      setCloudStatus('Please sign in first');
-      setTimeout(() => setCloudStatus(''), 3000);
-      return;
-    }
-
-    setCloudStatus('Syncing...');
-    const cloudData: CloudData = {
-      playerState,
-      dailyMetrics,
-      quests,
-      weeklyBoss,
-      tasks,
-      bosses,
-      lastUpdated: new Date().toISOString()
-    };
-    
-    const result = await saveToCloud(cloudData);
-    setCloudStatus(result.success ? '✓ Synced to cloud!' : result.message);
-    setTimeout(() => setCloudStatus(''), 3000);
-  };
-
-  const handleCloudRestore = async () => {
-    if (!cloudUser) {
-      setCloudStatus('Please sign in first');
-      setTimeout(() => setCloudStatus(''), 3000);
-      return;
-    }
-
-    setCloudStatus('Loading...');
-    const result = await loadFromCloud();
-    
-    if (result.success && result.data) {
-      setPlayerState(result.data.playerState);
-      setDailyMetrics(result.data.dailyMetrics);
-      setQuests(result.data.quests);
-      setWeeklyBoss(result.data.weeklyBoss);
-      setTasks(result.data.tasks);
-      setBosses(result.data.bosses || []);
-      setCloudStatus('✓ Restored from cloud!');
-    } else {
-      setCloudStatus(result.message);
-    }
-    setTimeout(() => setCloudStatus(''), 3000);
-  };
-
-  const toggleAutoCloudSync = () => {
-    const newValue = !autoCloudSync;
-    setAutoCloudSync(newValue);
-    localStorage.setItem('autoCloudSync', String(newValue));
-  };
-
-
   const factoryReset = () => {
     // Stop all state persistence immediately
     isResettingRef.current = true;
@@ -2032,10 +1859,6 @@ export default function App() {
                 syncSettings={syncSettings}
                 syncStatus={syncStatus}
                 backupStatus={backupStatus}
-                cloudUser={cloudUser}
-                cloudStatus={cloudStatus}
-                autoCloudSync={autoCloudSync}
-                firebaseConfigured={isFirebaseConfigured()}
                 onSyncSettingsChange={(settings) => {
                   setSyncSettings(settings);
                   saveSyncSettings(settings);
@@ -2049,12 +1872,6 @@ export default function App() {
                     });
                   }
                 }}
-                onCloudSignIn={handleCloudSignIn}
-                onCloudSignOut={handleCloudSignOut}
-                onCloudSignUp={handleCloudSignUp}
-                onManualCloudSync={handleManualCloudSync}
-                onCloudRestore={handleCloudRestore}
-                onToggleAutoCloudSync={toggleAutoCloudSync}
                 onSetupBackup={async () => {
                   const result = await setupBackupDirectory();
                   setBackupStatus(result.message);
@@ -5343,133 +5160,14 @@ function LegacyBossDisplay({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function CloudAuthForm({ onSignIn, onSignUp }: { 
-  onSignIn: (email: string, password: string) => Promise<boolean>,
-  onSignUp: (email: string, password: string) => Promise<boolean>
-}) {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-    
-    setLoading(true);
-    const success = isSignUp 
-      ? await onSignUp(email, password)
-      : await onSignIn(email, password);
-    
-    setLoading(false);
-    
-    if (success) {
-      setEmail('');
-      setPassword('');
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        {isSignUp ? 'Create an account' : 'Sign in'} to sync your data across all devices!
-      </p>
-      
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-2">Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-400 focus:outline-none text-sm"
-            required
-            disabled={loading}
-          />
-        </div>
-        
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-2">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="w-full px-4 py-3 rounded-xl border-2 border-blue-200 focus:border-blue-400 focus:outline-none text-sm"
-            required
-            minLength={6}
-            disabled={loading}
-          />
-          {isSignUp && (
-            <p className="text-xs text-slate-500 mt-1">At least 6 characters</p>
-          )}
-        </div>
-        
-        <button
-          type="submit"
-          disabled={loading || !email || !password}
-          className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all"
-        >
-          {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
-        </button>
-      </form>
-      
-      <div className="text-center">
-        <button
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function HistoryTab({ 
-  metrics, 
-  tasks, 
-  syncSettings, 
-  syncStatus, 
-  backupStatus,
-  cloudUser,
-  cloudStatus,
-  autoCloudSync,
-  firebaseConfigured,
-  onSyncSettingsChange, 
-  onManualSync, 
-  onCloudSignIn,
-  onCloudSignOut,
-  onCloudSignUp,
-  onManualCloudSync,
-  onCloudRestore,
-  onToggleAutoCloudSync,
-  onSetupBackup, 
-  onManualBackup, 
-  onRestoreBackup, 
-  onClearBackup, 
-  onDelete, 
-  onReset, 
-  onEditDate 
-}: { 
+function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onManualBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
   syncSettings: SyncSettings,
   syncStatus: string,
   backupStatus: string,
-  cloudUser: User | null,
-  cloudStatus: string,
-  autoCloudSync: boolean,
-  firebaseConfigured: boolean,
   onSyncSettingsChange: (settings: SyncSettings) => void,
   onManualSync: () => void,
-  onCloudSignIn: (email: string, password: string) => Promise<boolean>,
-  onCloudSignOut: () => void,
-  onCloudSignUp: (email: string, password: string) => Promise<boolean>,
-  onManualCloudSync: () => void,
-  onCloudRestore: () => void,
-  onToggleAutoCloudSync: () => void,
   onSetupBackup: () => void,
   onManualBackup: () => void,
   onRestoreBackup: () => void,
@@ -5744,77 +5442,6 @@ function HistoryTab({
           </ul>
         </div>
       </div>
-
-      {/* Cloud Sync Section */}
-      {firebaseConfigured && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-3xl border-2 border-blue-200 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">☁️ Cloud Sync</h3>
-            {cloudStatus && (
-              <span className="text-xs font-bold text-blue-700">{cloudStatus}</span>
-            )}
-          </div>
-
-          {!cloudUser ? (
-            <CloudAuthForm 
-              onSignIn={onCloudSignIn}
-              onSignUp={onCloudSignUp}
-            />
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-xl border border-blue-200">
-                <div className="text-xs font-bold text-slate-600 mb-1">Signed in as:</div>
-                <div className="text-sm font-bold text-slate-800">{cloudUser.displayName || cloudUser.email}</div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-200">
-                <span className="text-sm font-bold text-slate-700">Auto-sync on every update</span>
-                <button
-                  onClick={onToggleAutoCloudSync}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    autoCloudSync ? 'bg-blue-500' : 'bg-slate-300'
-                  }`}
-                >
-                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                    autoCloudSync ? 'translate-x-6' : ''
-                  }`} />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={onManualCloudSync}
-                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  ☁️ Sync Now
-                </button>
-                <button
-                  onClick={onCloudRestore}
-                  className="w-full py-3 bg-white hover:bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  ↩️ Restore from Cloud
-                </button>
-                <button
-                  onClick={onCloudSignOut}
-                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white/50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
-            <div className="font-bold">✨ Benefits:</div>
-            <ul className="list-disc list-inside space-y-1 text-[11px]">
-              <li>Access your data from any device</li>
-              <li>Automatic real-time sync</li>
-              <li>Never lose your progress</li>
-              <li>Free with Google account</li>
-            </ul>
-          </div>
-        </div>
-      )}
 
       <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
         <div className="flex items-center justify-between">
