@@ -58,6 +58,8 @@ export async function saveToCloud(
   tasks: Task[]
 ): Promise<{ success: boolean; message: string }> {
   try {
+    console.log('Starting cloud sync for user:', userId);
+    
     const cloudData: CloudData = {
       playerState,
       dailyMetrics,
@@ -68,10 +70,22 @@ export async function saveToCloud(
       lastSync: new Date().toISOString()
     };
 
+    console.log('Data to sync:', {
+      playerStateKeys: Object.keys(playerState),
+      metricsCount: Object.keys(dailyMetrics).length,
+      questsCount: quests.length,
+      bossesCount: bosses.length,
+      tasksCount: tasks.length
+    });
+
     // Clean undefined values before saving to Firebase
     const cleanedData = cleanUndefined(cloudData);
+    
+    console.log('Cleaned data ready, saving to Firestore...');
 
     await setDoc(doc(db, 'users', userId), cleanedData);
+    
+    console.log('Cloud sync successful!');
     
     return {
       success: true,
@@ -79,6 +93,10 @@ export async function saveToCloud(
     };
   } catch (error: any) {
     console.error('Cloud sync error:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Full error:', JSON.stringify(error, null, 2));
+    
     return {
       success: false,
       message: `Sync failed: ${error.message}`
@@ -92,14 +110,18 @@ export async function loadFromCloud(userId: string): Promise<{
   data?: CloudData;
 }> {
   try {
+    console.log('Loading data from cloud for user:', userId);
+    
     const docRef = doc(db, 'users', userId);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
+      console.log('Cloud data found, loading...');
       const data = docSnap.data() as CloudData;
       
       // Ensure customHabits exists
       if (!data.playerState.customHabits) {
+        console.log('Adding default customHabits to loaded data');
         data.playerState.customHabits = {
           business: DEFAULT_BUSINESS_HABITS,
           health: DEFAULT_HEALTH_HABITS,
@@ -111,12 +133,15 @@ export async function loadFromCloud(userId: string): Promise<{
       // Migrate metrics if needed
       data.dailyMetrics = migrateMetrics(data.dailyMetrics, data.playerState.customHabits);
       
+      console.log('Cloud data loaded successfully');
+      
       return {
         success: true,
         message: 'Data loaded from cloud',
         data
       };
     } else {
+      console.log('No cloud data found for this user');
       return {
         success: false,
         message: 'No cloud data found'
@@ -124,6 +149,9 @@ export async function loadFromCloud(userId: string): Promise<{
     }
   } catch (error: any) {
     console.error('Cloud load error:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    
     return {
       success: false,
       message: `Load failed: ${error.message}`
