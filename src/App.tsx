@@ -5483,7 +5483,12 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
                 className="flex-1 text-left space-y-1 hover:opacity-70 transition-opacity"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  {(() => {
+                    // Parse date string directly to avoid timezone issues
+                    const [year, month, dayNum] = day.date.split('-').map(Number);
+                    const date = new Date(year, month - 1, dayNum);
+                    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  })()}
                   <ChevronRight size={14} className="text-slate-300" />
                 </div>
                 <div className="flex gap-3">
