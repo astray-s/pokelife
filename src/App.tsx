@@ -975,8 +975,12 @@ export default function App() {
 
   const saveMetrics = (metrics: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, date?: string) => {
     try {
+      console.log('saveMetrics called with:', { metrics, date, hasCustomHabits: !!playerState.customHabits });
+      
       const targetDate = date || getTodayISO();
       const newXP = calculateXP(metrics, targetDate);
+      
+      console.log('Calculated XP:', newXP);
 
       const updatedMetrics: DailyMetrics = {
         ...metrics,
@@ -994,11 +998,15 @@ export default function App() {
       const oldTotalXP = playerState.totalXP;
       const totalXPDiff = newTotalXP - oldTotalXP;
       
+      console.log('XP calculation:', { newTotalXP, oldTotalXP, totalXPDiff });
+      
       // Update player's total XP to match the sum of all daily XP
       setPlayerState(prevPlayer => {
         const newLevel = getLevel(newTotalXP);
         
-        let newEggs = [...prevPlayer.eggs];
+        console.log('Level check:', { oldLevel: prevPlayer.level, newLevel });
+        
+        let newEggs = [...(prevPlayer.eggs || [])];
         if (newLevel > prevPlayer.level) {
           // Give an egg based on level
           const rarity = newLevel >= 21 ? 'legendary' : 
@@ -1014,6 +1022,7 @@ export default function App() {
           
           newEggs = [levelEgg, ...newEggs];
           setNewDrop({ egg: levelEgg });
+          console.log('Level up! New egg added:', levelEgg);
         }
         
         return {
@@ -1034,6 +1043,7 @@ export default function App() {
       const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
       
       if (newlyUnlocked.length > 0) {
+        console.log('Milestone unlocked:', newlyUnlocked[0]);
         // Unlock the first new milestone - give an egg
         const milestone = newlyUnlocked[0];
         
@@ -1046,7 +1056,7 @@ export default function App() {
         
         setPlayerState(prev => ({
           ...prev,
-          eggs: [milestoneEgg, ...prev.eggs],
+          eggs: [milestoneEgg, ...(prev.eggs || [])],
           unlockedMilestones: [
             ...(prev.unlockedMilestones || []),
             {
@@ -1062,9 +1072,13 @@ export default function App() {
       }
       
       // Check for daily egg reward (>2 hours of work)
+      // Safely access workHours - it might not exist in old data
+      const workHours = (metrics as any).workHours || 0;
       const lastClaim = playerState.lastDailyEggClaim;
       const canClaimToday = lastClaim !== targetDate;
-      const workedEnough = metrics.workHours >= 2;
+      const workedEnough = workHours >= 2;
+      
+      console.log('Daily egg check:', { workHours, lastClaim, canClaimToday, workedEnough });
       
       if (canClaimToday && workedEnough && targetDate === getTodayISO()) {
         // Give daily egg reward
@@ -1077,11 +1091,12 @@ export default function App() {
         
         setPlayerState(prev => ({
           ...prev,
-          eggs: [dailyEgg, ...prev.eggs],
+          eggs: [dailyEgg, ...(prev.eggs || [])],
           lastDailyEggClaim: targetDate
         }));
         
         setNewDrop({ egg: dailyEgg });
+        console.log('Daily egg reward given:', dailyEgg);
       }
       
       // Auto-sync if enabled
@@ -1111,8 +1126,11 @@ export default function App() {
         rollDrop();
       }
     }
+    
+    console.log('saveMetrics completed successfully');
     } catch (error) {
       console.error('Error in saveMetrics:', error);
+      console.error('Error stack:', (error as Error).stack);
       alert('Failed to save metrics. Please try again or reload the page. Error: ' + (error as Error).message);
     }
   };
