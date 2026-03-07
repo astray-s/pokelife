@@ -13,6 +13,29 @@ interface CloudData {
   lastSync: string;
 }
 
+// Remove undefined values from objects recursively (Firebase doesn't allow undefined)
+function cleanUndefined(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanUndefined(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = cleanUndefined(obj[key]);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
 // Migrate old metrics to use custom habit IDs
 function migrateMetrics(metrics: Record<string, DailyMetrics>, customHabits: CustomHabits): Record<string, DailyMetrics> {
   const migratedMetrics: Record<string, DailyMetrics> = {};
@@ -45,7 +68,10 @@ export async function saveToCloud(
       lastSync: new Date().toISOString()
     };
 
-    await setDoc(doc(db, 'users', userId), cloudData);
+    // Clean undefined values before saving to Firebase
+    const cleanedData = cleanUndefined(cloudData);
+
+    await setDoc(doc(db, 'users', userId), cleanedData);
     
     return {
       success: true,
