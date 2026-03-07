@@ -923,6 +923,12 @@ export default function App() {
   // --- Actions ---
 
   // Calculate XP from metrics using custom habits
+  // IMPORTANT: This function calculates XP based on CURRENT custom habits.
+  // Once XP is saved to a DailyMetrics entry, it should NOT be recalculated.
+  // This allows habits to change over time without affecting historical XP.
+  // - If a habit is deleted, old metrics with that habit ID are ignored (no error)
+  // - If a habit is added, only new metrics will include it
+  // - Historical XP remains unchanged
   const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, dateString: string) => {
     try {
       const customHabits = playerState.customHabits;
@@ -942,12 +948,30 @@ export default function App() {
         ...(customHabits.trainerBoosts || []),
         ...(customHabits.statusEffects || [])
       ];
+      
+      // Check for orphaned habit data (habits in metrics but not in current config)
+      const currentHabitIds = new Set(allHabits.map(h => h.id));
+      const metricsKeys = Object.keys(m);
+      const orphanedHabits = metricsKeys.filter(key => 
+        !currentHabitIds.has(key) && 
+        !['date', 'xpEarned', 'claimedQuestIds'].includes(key)
+      );
+      
+      if (orphanedHabits.length > 0) {
+        console.log(`Date ${dateString}: Found ${orphanedHabits.length} orphaned habits (deleted from config):`, orphanedHabits);
+      }
 
       allHabits.forEach(habit => {
         try {
           const value = (m as any)[habit.id];
           
-          if (value === undefined || value === null) return;
+          // If this habit doesn't exist in the metrics, skip it
+          // This handles cases where habits are added/deleted over time
+          if (value === undefined || value === null) {
+            // Habit exists in current config but not in this day's metrics
+            // This is normal for newly added habits
+            return;
+          }
 
           if (habit.type === 'boolean') {
             // Boolean: add/subtract XP if checked
