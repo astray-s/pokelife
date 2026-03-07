@@ -906,15 +906,22 @@ export default function App() {
 
   // Calculate XP from metrics using custom habits
   const calculateXP = (m: Omit<DailyMetrics, 'date' | 'xpEarned' | 'claimedQuestIds'>, dateString: string) => {
-    const customHabits = playerState.customHabits!;
+    const customHabits = playerState.customHabits;
+    
+    // Safety check - if no custom habits, return 0
+    if (!customHabits) {
+      console.error('No custom habits found in playerState');
+      return 0;
+    }
+    
     let totalXP = 0;
 
     // Calculate XP from all custom habits
     const allHabits = [
-      ...customHabits.business,
-      ...customHabits.health,
-      ...customHabits.trainerBoosts,
-      ...customHabits.statusEffects
+      ...(customHabits.business || []),
+      ...(customHabits.health || []),
+      ...(customHabits.trainerBoosts || []),
+      ...(customHabits.statusEffects || [])
     ];
 
     allHabits.forEach(habit => {
@@ -5205,13 +5212,32 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, on
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.playerState) localStorage.setItem('synthPoke_playerState', data.playerState);
-        if (data.dailyMetrics) localStorage.setItem('synthPoke_dailyMetrics', data.dailyMetrics);
-        if (data.quests) localStorage.setItem('synthPoke_quests', data.quests);
-        if (data.weeklyBoss) localStorage.setItem('synthPoke_weeklyBoss', data.weeklyBoss);
-        if (data.tasks) localStorage.setItem('synthPoke_tasks', data.tasks);
+        
+        // Parse the stringified data before setting to localStorage
+        if (data.playerState) {
+          const playerData = typeof data.playerState === 'string' ? data.playerState : JSON.stringify(data.playerState);
+          localStorage.setItem('synthPoke_playerState', playerData);
+        }
+        if (data.dailyMetrics) {
+          const metricsData = typeof data.dailyMetrics === 'string' ? data.dailyMetrics : JSON.stringify(data.dailyMetrics);
+          localStorage.setItem('synthPoke_dailyMetrics', metricsData);
+        }
+        if (data.quests) {
+          const questsData = typeof data.quests === 'string' ? data.quests : JSON.stringify(data.quests);
+          localStorage.setItem('synthPoke_quests', questsData);
+        }
+        if (data.weeklyBoss) {
+          const bossData = typeof data.weeklyBoss === 'string' ? data.weeklyBoss : JSON.stringify(data.weeklyBoss);
+          localStorage.setItem('synthPoke_weeklyBoss', bossData);
+        }
+        if (data.tasks) {
+          const tasksData = typeof data.tasks === 'string' ? data.tasks : JSON.stringify(data.tasks);
+          localStorage.setItem('synthPoke_tasks', tasksData);
+        }
+        
         window.location.reload();
       } catch (err) {
+        console.error('Import error:', err);
         alert('Failed to import data. Invalid file format.');
       }
     };
