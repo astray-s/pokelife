@@ -713,10 +713,8 @@ export default function App() {
   const [showBackupSettings, setShowBackupSettings] = useState(false);
   const [cloudUser, setCloudUser] = useState<User | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string>('');
-  const [cloudLoading, setCloudLoading] = useState(false);
   const [autoCloudSync, setAutoCloudSync] = useState(() => {
-    const saved = localStorage.getItem('autoCloudSync');
-    return saved === null ? true : saved === 'true'; // Default to true
+    return localStorage.getItem('autoCloudSync') === 'true';
   });
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
@@ -872,100 +870,58 @@ export default function App() {
       setCloudUser(user);
       if (user) {
         setCloudStatus(`Signed in as ${user.displayName || user.email}`);
-        setCloudLoading(true);
-        
-        // Automatically load and merge with cloud data
+        // Load data from cloud when signing in
         loadFromCloud().then(result => {
           if (result.success && result.data) {
-            try {
-              const cloudTime = new Date(result.data.lastUpdated).getTime();
-              const localTime = new Date(localStorage.getItem('lastLocalUpdate') || 0).getTime();
-              
-              // Use whichever data is more recent
-              if (cloudTime > localTime) {
-                // Cloud is newer - restore from cloud
-                if (result.data.playerState) setPlayerState(result.data.playerState);
-                if (result.data.dailyMetrics) setDailyMetrics(result.data.dailyMetrics);
-                if (result.data.quests) setQuests(result.data.quests);
-                if (result.data.weeklyBoss !== undefined) setWeeklyBoss(result.data.weeklyBoss);
-                if (result.data.tasks) setTasks(result.data.tasks);
-                if (result.data.bosses) setBosses(result.data.bosses);
-                
-                localStorage.setItem('lastLocalUpdate', result.data.lastUpdated);
-                setCloudStatus('✓ Synced from cloud');
-                setTimeout(() => setCloudStatus(''), 2000);
-              } else if (localTime > 0) {
-                // Local is newer or same, push to cloud
-                const cloudData: CloudData = {
-                  playerState,
-                  dailyMetrics,
-                  quests,
-                  weeklyBoss,
-                  tasks,
-                  bosses,
-                  lastUpdated: new Date().toISOString()
-                };
-                saveToCloud(cloudData).then(() => {
-                  setCloudStatus('✓ Synced to cloud');
-                  setTimeout(() => setCloudStatus(''), 2000);
-                });
-              }
-            } catch (error) {
-              console.error('Cloud sync error:', error);
-              setCloudStatus('Sync error - using local data');
+            const shouldRestore = confirm(
+              'Cloud data found! Do you want to restore your data from the cloud?\n\n' +
+              `Last synced: ${new Date(result.data.lastUpdated).toLocaleString()}\n\n` +
+              'Click OK to restore, or Cancel to keep local data.'
+            );
+            
+            if (shouldRestore) {
+              setPlayerState(result.data.playerState);
+              setDailyMetrics(result.data.dailyMetrics);
+              setQuests(result.data.quests);
+              setWeeklyBoss(result.data.weeklyBoss);
+              setTasks(result.data.tasks);
+              setBosses(result.data.bosses || []);
+              setCloudStatus('✓ Restored from cloud');
               setTimeout(() => setCloudStatus(''), 3000);
             }
           }
-          setCloudLoading(false);
-        }).catch(error => {
-          console.error('Failed to load from cloud:', error);
-          setCloudStatus('Failed to load - using local data');
-          setTimeout(() => setCloudStatus(''), 3000);
-          setCloudLoading(false);
         });
       } else {
         setCloudStatus('');
-        setCloudLoading(false);
       }
     });
     
     return unsubscribe;
   }, []);
 
-  // Auto cloud sync - more frequent updates
+  // Auto cloud sync
   useEffect(() => {
     if (!isFirebaseConfigured() || !cloudUser || !autoCloudSync) return;
     if (isResettingRef.current) return;
     
     const timeoutId = setTimeout(() => {
-      try {
-        const cloudData: CloudData = {
-          playerState,
-          dailyMetrics,
-          quests,
-          weeklyBoss,
-          tasks,
-          bosses,
-          lastUpdated: new Date().toISOString()
-        };
-        
-        // Update local timestamp
-        localStorage.setItem('lastLocalUpdate', cloudData.lastUpdated);
-        
-        saveToCloud(cloudData).then(result => {
-          if (result.success) {
-            setCloudStatus('☁️');
-            setTimeout(() => setCloudStatus(''), 1000);
-          } else {
-            console.error('Cloud sync failed:', result.message);
-          }
-        }).catch(error => {
-          console.error('Cloud sync error:', error);
-        });
-      } catch (error) {
-        console.error('Failed to prepare cloud data:', error);
-      }
-    }, 500); // Faster debounce - 500ms instead of 2s
+      const cloudData: CloudData = {
+        playerState,
+        dailyMetrics,
+        quests,
+        weeklyBoss,
+        tasks,
+        bosses,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      saveToCloud(cloudData).then(result => {
+        if (result.success) {
+          setCloudStatus('☁️ Synced');
+          setTimeout(() => setCloudStatus(''), 2000);
+        }
+      });
+    }, 2000); // Debounce 2 seconds
     
     return () => clearTimeout(timeoutId);
   }, [playerState, dailyMetrics, quests, weeklyBoss, tasks, bosses, cloudUser, autoCloudSync]);
@@ -1736,19 +1692,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FDFCF0] text-[#4A4A4A] font-sans pb-24">
-      {/* Loading overlay for cloud sync */}
-      {cloudLoading && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl text-center space-y-4">
-            <div className="w-16 h-16 mx-auto">
-              <PokeballSpinner size={64} />
-            </div>
-            <div className="text-lg font-bold text-slate-800">Syncing data...</div>
-            <div className="text-sm text-slate-500">Please wait</div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E4D8] px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -5849,12 +5792,12 @@ function HistoryTab({
           )}
 
           <div className="bg-white/50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
-            <div className="font-bold">✨ How it works:</div>
+            <div className="font-bold">✨ Benefits:</div>
             <ul className="list-disc list-inside space-y-1 text-[11px]">
-              <li>Syncs automatically every 500ms after changes</li>
-              <li>Always uses the most recent data</li>
-              <li>Works seamlessly across all devices</li>
-              <li>No prompts - just works!</li>
+              <li>Access your data from any device</li>
+              <li>Automatic real-time sync</li>
+              <li>Never lose your progress</li>
+              <li>Free with Google account</li>
             </ul>
           </div>
         </div>
