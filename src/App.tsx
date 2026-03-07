@@ -68,6 +68,7 @@ import { checkMilestones, MILESTONES, Milestone } from './milestones';
 import { generateWeeklyStats, generateShareableCard, downloadCard, copyCardToClipboard, WeeklyStats } from './shareCard';
 import { Egg, getEggColor, getEggGradient, hatchEgg, EXPANDED_POKEMON_POOLS } from './eggs';
 import { saveBackup, setupBackupDirectory, getBackupInfo, restoreFromBackup, clearBackupConfig } from './jsonBackup';
+import { saveToCloud, loadFromCloud } from './cloudSync';
 import { getSizeCategory, getWeightCategory, generatePokemonCharacteristics } from './pokemonCharacteristics';
 
 // --- Pokemon-themed Animation Components ---
@@ -627,6 +628,10 @@ export default function App() {
   const [shareCardStats, setShareCardStats] = useState<WeeklyStats | null>(null);
   const [backupStatus, setBackupStatus] = useState<string>('');
   const [showBackupSettings, setShowBackupSettings] = useState(false);
+  const [cloudUserId, setCloudUserId] = useState<string>(() => {
+    return localStorage.getItem('pokelife_cloudUserId') || '';
+  });
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<string>('');
   
   const [playerState, setPlayerState] = useState<PlayerState>(() => {
     const saved = localStorage.getItem('synthPoke_playerState');
@@ -1367,6 +1372,50 @@ export default function App() {
     });
   };
 
+  // Cloud Sync Handlers
+  const handleCloudSync = async () => {
+    if (!cloudUserId.trim()) {
+      setCloudSyncStatus('Please enter a User ID');
+      setTimeout(() => setCloudSyncStatus(''), 3000);
+      return;
+    }
+
+    setCloudSyncStatus('Syncing...');
+    const result = await saveToCloud(cloudUserId, playerState, dailyMetrics, quests, weeklyBoss, bosses, tasks);
+    setCloudSyncStatus(result.success ? '✓ Synced to cloud!' : result.message);
+    setTimeout(() => setCloudSyncStatus(''), 3000);
+    
+    if (result.success) {
+      localStorage.setItem('pokelife_cloudUserId', cloudUserId);
+    }
+  };
+
+  const handleCloudRestore = async () => {
+    if (!cloudUserId.trim()) {
+      setCloudSyncStatus('Please enter a User ID');
+      setTimeout(() => setCloudSyncStatus(''), 3000);
+      return;
+    }
+
+    setCloudSyncStatus('Loading from cloud...');
+    const result = await loadFromCloud(cloudUserId);
+    
+    if (result.success && result.data) {
+      setPlayerState(result.data.playerState);
+      setDailyMetrics(result.data.dailyMetrics);
+      setQuests(result.data.quests);
+      setWeeklyBoss(result.data.weeklyBoss);
+      setBosses(result.data.bosses || []);
+      setTasks(result.data.tasks);
+      setCloudSyncStatus('✓ Restored from cloud!');
+      localStorage.setItem('pokelife_cloudUserId', cloudUserId);
+    } else {
+      setCloudSyncStatus(result.message);
+    }
+    
+    setTimeout(() => setCloudSyncStatus(''), 3000);
+  };
+
   const factoryReset = () => {
     // Stop all state persistence immediately
     isResettingRef.current = true;
@@ -1842,6 +1891,11 @@ export default function App() {
                 syncSettings={syncSettings}
                 syncStatus={syncStatus}
                 backupStatus={backupStatus}
+                cloudUserId={cloudUserId}
+                cloudSyncStatus={cloudSyncStatus}
+                onCloudUserIdChange={setCloudUserId}
+                onCloudSync={handleCloudSync}
+                onCloudRestore={handleCloudRestore}
                 onSyncSettingsChange={(settings) => {
                   setSyncSettings(settings);
                   saveSyncSettings(settings);
@@ -5143,12 +5197,17 @@ function LegacyBossDisplay({ boss }: { boss: WeeklyBoss | null }) {
   );
 }
 
-function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, onSyncSettingsChange, onManualSync, onSetupBackup, onManualBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
+function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cloudUserId, cloudSyncStatus, onCloudUserIdChange, onCloudSync, onCloudRestore, onSyncSettingsChange, onManualSync, onSetupBackup, onManualBackup, onRestoreBackup, onClearBackup, onDelete, onReset, onEditDate }: { 
   metrics: Record<string, DailyMetrics>, 
   tasks: Task[],
   syncSettings: SyncSettings,
   syncStatus: string,
   backupStatus: string,
+  cloudUserId: string,
+  cloudSyncStatus: string,
+  onCloudUserIdChange: (id: string) => void,
+  onCloudSync: () => void,
+  onCloudRestore: () => void,
   onSyncSettingsChange: (settings: SyncSettings) => void,
   onManualSync: () => void,
   onSetupBackup: () => void,
@@ -5370,6 +5429,56 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, on
             </div>
           ))
         )}
+      </div>
+
+      {/* Cloud Sync Section */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">☁️ Firebase Cloud Sync</h3>
+          {cloudSyncStatus && (
+            <span className="text-xs font-bold text-green-600">{cloudSyncStatus}</span>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-2 block">User ID (email or unique ID)</label>
+            <input
+              type="text"
+              value={cloudUserId}
+              onChange={(e) => onCloudUserIdChange(e.target.value)}
+              placeholder="your-email@example.com"
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onCloudSync}
+              disabled={!cloudUserId.trim()}
+              className="py-3 bg-blue-50 text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ☁️ Sync to Cloud
+            </button>
+            <button
+              onClick={onCloudRestore}
+              disabled={!cloudUserId.trim()}
+              className="py-3 bg-purple-50 text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ↓ Restore from Cloud
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-600 space-y-1">
+          <div className="font-bold">How it works:</div>
+          <ul className="list-disc list-inside space-y-1 text-[11px]">
+            <li>Enter your email or unique ID</li>
+            <li>Click "Sync to Cloud" to save your data to Firebase</li>
+            <li>Use "Restore from Cloud" to load your data on any device</li>
+            <li>Your data is automatically migrated to work with custom habits</li>
+          </ul>
+        </div>
       </div>
 
       {/* JSON Backup Section */}
