@@ -593,16 +593,11 @@ const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
 // --- Utils ---
 
 const getTodayISO = () => {
-  // Get current date in PST/PDT (Los Angeles timezone)
   const now = new Date();
   
-  // Convert to PST/PDT by getting UTC time and adjusting
-  // PST is UTC-8, PDT is UTC-7
-  // We'll use a more direct approach
-  const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  // Get date in Los Angeles timezone
   const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
   
-  // Get the date components directly from the PST date
   const year = pstDate.getFullYear();
   const month = String(pstDate.getMonth() + 1).padStart(2, '0');
   const day = String(pstDate.getDate()).padStart(2, '0');
@@ -611,12 +606,10 @@ const getTodayISO = () => {
   
   console.log('Date Debug:', {
     systemTime: now.toString(),
-    utcTime: utcDate.toString(),
+    systemUTC: now.toISOString(),
     pstTime: pstDate.toString(),
     calculatedDate: dateStr,
-    year,
-    month,
-    day
+    components: { year, month, day }
   });
   
   return dateStr;
