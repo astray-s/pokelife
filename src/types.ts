@@ -23,42 +23,10 @@ export interface CaughtPokemon extends Pokemon {
 export interface DailyMetrics {
   date: string; // ISO YYYY-MM-DD
   
-  // Main Attacks (Business & Work)
-  workHours: number;
-  discoveryCalls: number;
-  networkingCalls: number;
-  salesCalls: number;
-  firstDmsSent: number;
-  followUpsSent: number;
-  commentingMinutes: number;
-  postsCreated: number;
-  postsPosted: number;
-  callsBooked: number;
-  callsTaken: number;
-  totalDmsSent: number;
-
-  // Special Moves (Health)
-  timeAsleep: string; // HH:MM format (PM, e.g., "21:15" for 9:15 PM)
-  timeAwake: string; // HH:MM format (AM, e.g., "05:00" for 5:00 AM)
-  coldShowers: number; // count
-  fastHours: number; // hours fasted
-  exerciseType: string; // "none", "upper", "lower", "cardio"
-  foodTracking: boolean; // did you track food today?
-
-  // Trainer Boosts (Daily Habits - all checkboxes)
-  affirmations: boolean;
-  visualizations: boolean;
-  planTomorrow: boolean;
-  storyList: boolean;
-  journal: boolean;
-
-  // Status Effects (Bad Habits - decrease XP)
-  youtube: boolean;
-  reels: boolean;
-  shorts: boolean;
-  processedFood: boolean;
-  gaming: boolean;
-
+  // Dynamic habit values - any habit ID can be a key
+  // These are the legacy/default fields for backwards compatibility
+  [key: string]: any;
+  
   xpEarned: number;
   claimedQuestIds: string[];
 }

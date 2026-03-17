@@ -998,11 +998,7 @@ export default function App() {
         }
       });
 
-      // Apply daily bonus
-      const seed = parseInt(dateString.replace(/-/g, '')) || 1;
-      const dailyBonus = 0.05 + ((seed % 10) / 100); 
-      totalXP *= (1 + dailyBonus);
-
+      // No random daily bonus - XP is calculated purely from habits
       return Math.floor(totalXP);
     } catch (error) {
       console.error('Error in calculateXP:', error);
@@ -1212,14 +1208,14 @@ export default function App() {
     // Apply damage to legacy weekly boss
     if (weeklyBoss && !weeklyBoss.defeated) {
       let damage = 0;
-      damage += metrics.workHours * 5;
-      damage += metrics.discoveryCalls * 15;
-      damage += metrics.salesCalls * 25;
-      damage += metrics.postsPosted * 10;
-      damage += metrics.callsBooked * 20;
+      damage += (metrics.workHours || 0) * 5;
+      damage += (metrics.discoveryCalls || 0) * 15;
+      damage += (metrics.salesCalls || 0) * 25;
+      damage += (metrics.postsPosted || 0) * 10;
+      damage += (metrics.callsBooked || 0) * 20;
 
       // Weakness bonus
-      const weaknessValue = metrics[weeklyBoss.weaknessType];
+      const weaknessValue = metrics[weeklyBoss.weaknessType] || 0;
       if (weaknessValue > 0) {
         damage += damage * 0.5; // 50% bonus for weakness
       }
@@ -1247,14 +1243,14 @@ export default function App() {
         if (boss.defeated) return boss;
         
         let damage = 0;
-        damage += metrics.workHours * (boss.type === 'mini' ? 10 : 5);
-        damage += metrics.discoveryCalls * (boss.type === 'mini' ? 30 : 15);
-        damage += metrics.salesCalls * (boss.type === 'mini' ? 50 : 25);
-        damage += metrics.postsPosted * (boss.type === 'mini' ? 20 : 10);
-        damage += metrics.callsBooked * (boss.type === 'mini' ? 40 : 20);
+        damage += (metrics.workHours || 0) * (boss.type === 'mini' ? 10 : 5);
+        damage += (metrics.discoveryCalls || 0) * (boss.type === 'mini' ? 30 : 15);
+        damage += (metrics.salesCalls || 0) * (boss.type === 'mini' ? 50 : 25);
+        damage += (metrics.postsPosted || 0) * (boss.type === 'mini' ? 20 : 10);
+        damage += (metrics.callsBooked || 0) * (boss.type === 'mini' ? 40 : 20);
 
         // Weakness bonus
-        const weaknessValue = metrics[boss.weaknessType];
+        const weaknessValue = metrics[boss.weaknessType] || 0;
         if (weaknessValue > 0) {
           damage += damage * 0.5; // 50% bonus for weakness
         }
@@ -3376,106 +3372,42 @@ function TodayTab({
   customHabits: CustomHabits,
   onManageHabits: () => void
 }) {
-  const [form, setForm] = useState({
-    // Main Attacks (Business)
-    workHours: metrics?.workHours || 0,
-    discoveryCalls: metrics?.discoveryCalls || 0,
-    networkingCalls: metrics?.networkingCalls || 0,
-    salesCalls: metrics?.salesCalls || 0,
-    firstDmsSent: metrics?.firstDmsSent || 0,
-    followUpsSent: metrics?.followUpsSent || 0,
-    commentingMinutes: metrics?.commentingMinutes || 0,
-    postsCreated: metrics?.postsCreated || 0,
-    postsPosted: metrics?.postsPosted || 0,
-    callsBooked: metrics?.callsBooked || 0,
-    callsTaken: metrics?.callsTaken || 0,
-    totalDmsSent: metrics?.totalDmsSent || 0,
-    // Special Moves (Health)
-    timeAsleep: metrics?.timeAsleep || '21:00',
-    timeAwake: metrics?.timeAwake || '05:00',
-    coldShowers: metrics?.coldShowers || 0,
-    fastHours: metrics?.fastHours || 0,
-    exerciseType: metrics?.exerciseType || 'none',
-    foodTracking: metrics?.foodTracking || false,
-    // Trainer Boosts (Daily Habits)
-    affirmations: metrics?.affirmations || false,
-    visualizations: metrics?.visualizations || false,
-    planTomorrow: metrics?.planTomorrow || false,
-    storyList: metrics?.storyList || false,
-    journal: metrics?.journal || false,
-    // Status Effects (Bad Habits)
-    youtube: metrics?.youtube || false,
-    reels: metrics?.reels || false,
-    shorts: metrics?.shorts || false,
-    processedFood: metrics?.processedFood || false,
-    gaming: metrics?.gaming || false,
-  });
+  // Build form state dynamically from custom habits
+  const buildFormState = (existingMetrics?: DailyMetrics) => {
+    const state: Record<string, any> = {};
+    
+    const allHabits = [
+      ...(customHabits.business || []),
+      ...(customHabits.health || []),
+      ...(customHabits.trainerBoosts || []),
+      ...(customHabits.statusEffects || [])
+    ];
+    
+    allHabits.forEach(habit => {
+      if (existingMetrics && (existingMetrics as any)[habit.id] !== undefined) {
+        state[habit.id] = (existingMetrics as any)[habit.id];
+      } else {
+        // Default values based on type
+        if (habit.type === 'boolean') {
+          state[habit.id] = false;
+        } else if (habit.type === 'number') {
+          state[habit.id] = 0;
+        } else if (habit.type === 'dropdown') {
+          state[habit.id] = habit.options?.[0] || 'none';
+        } else if (habit.type === 'text') {
+          state[habit.id] = '';
+        }
+      }
+    });
+    
+    return state;
+  };
+
+  const [form, setForm] = useState(() => buildFormState(metrics));
 
   useEffect(() => {
-    if (metrics) {
-      setForm({
-        workHours: metrics.workHours,
-        discoveryCalls: metrics.discoveryCalls,
-        networkingCalls: metrics.networkingCalls,
-        salesCalls: metrics.salesCalls,
-        firstDmsSent: metrics.firstDmsSent,
-        followUpsSent: metrics.followUpsSent,
-        commentingMinutes: metrics.commentingMinutes,
-        postsCreated: metrics.postsCreated,
-        postsPosted: metrics.postsPosted,
-        callsBooked: metrics.callsBooked,
-        callsTaken: metrics.callsTaken,
-        totalDmsSent: metrics.totalDmsSent,
-        timeAsleep: metrics.timeAsleep,
-        timeAwake: metrics.timeAwake,
-        coldShowers: metrics.coldShowers,
-        fastHours: metrics.fastHours,
-        exerciseType: metrics.exerciseType,
-        foodTracking: metrics.foodTracking,
-        affirmations: metrics.affirmations,
-        visualizations: metrics.visualizations,
-        planTomorrow: metrics.planTomorrow,
-        storyList: metrics.storyList,
-        journal: metrics.journal,
-        youtube: metrics.youtube,
-        reels: metrics.reels,
-        shorts: metrics.shorts,
-        processedFood: metrics.processedFood,
-        gaming: metrics.gaming,
-      });
-    } else {
-      setForm({
-        workHours: 0,
-        discoveryCalls: 0,
-        networkingCalls: 0,
-        salesCalls: 0,
-        firstDmsSent: 0,
-        followUpsSent: 0,
-        commentingMinutes: 0,
-        postsCreated: 0,
-        postsPosted: 0,
-        callsBooked: 0,
-        callsTaken: 0,
-        totalDmsSent: 0,
-        timeAsleep: '21:00',
-        timeAwake: '05:00',
-        coldShowers: 0,
-        fastHours: 0,
-        exerciseType: 'none',
-        foodTracking: false,
-        affirmations: false,
-        visualizations: false,
-        planTomorrow: false,
-        storyList: false,
-        journal: false,
-        youtube: false,
-        reels: false,
-        shorts: false,
-        processedFood: false,
-        gaming: false,
-      });
-    }
-  }, [metrics]);
+    setForm(buildFormState(metrics));
+  }, [metrics, customHabits]);
 
   const handleChange = (key: string, val: any) => {
     setForm(prev => ({ ...prev, [key]: val }));
@@ -5573,9 +5505,9 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
                   <ChevronRight size={14} className="text-slate-300" />
                 </div>
                 <div className="flex gap-3">
-                  <StatMini label="Work" val={day.workHours} />
-                  <StatMini label="DMs" val={day.totalDmsSent} />
-                  <StatMini label="Calls" val={day.callsTaken + day.callsBooked} />
+                  <StatMini label="Work" val={(day as any).workHours || 0} />
+                  <StatMini label="DMs" val={(day as any).firstDmsSent || 0} />
+                  <StatMini label="Calls" val={((day as any).callsBooked || 0) + ((day as any).discoveryCalls || 0)} />
                 </div>
               </button>
               <div className="flex items-center gap-4">
