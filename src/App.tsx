@@ -592,27 +592,27 @@ const TaskCompleteAnimation = ({ onComplete }: { onComplete?: () => void }) => {
 
 // --- Utils ---
 
-const getTodayISO = () => {
+  const getTodayISO = () => {
   const now = new Date();
-  
-  // Get date in Los Angeles timezone
   const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-  
   const year = pstDate.getFullYear();
   const month = String(pstDate.getMonth() + 1).padStart(2, '0');
   const day = String(pstDate.getDate()).padStart(2, '0');
-  
-  const dateStr = `${year}-${month}-${day}`;
-  
-  console.log('Date Debug:', {
-    systemTime: now.toString(),
-    systemUTC: now.toISOString(),
-    pstTime: pstDate.toString(),
-    calculatedDate: dateStr,
-    components: { year, month, day }
-  });
-  
-  return dateStr;
+  return `${year}-${month}-${day}`;
+};
+
+// Parse "YYYY-MM-DD" as local date (not UTC) to avoid off-by-one timezone bugs
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// Get "YYYY-MM-DD" from a local Date object (timezone-safe)
+const toLocalISO = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const getWeekId = (date: Date) => {
@@ -805,14 +805,47 @@ export default function App() {
     });
   }, []);
 
+  // Get current habit IDs from custom habits config
+  const getCurrentHabitIds = () => {
+    const ch = playerState.customHabits;
+    if (!ch) return new Set<string>();
+    return new Set([
+      ...(ch.business || []).map(h => h.id),
+      ...(ch.health || []).map(h => h.id),
+      ...(ch.trainerBoosts || []).map(h => h.id),
+      ...(ch.statusEffects || []).map(h => h.id),
+    ]);
+  };
+
+  // Get current metric keys dynamically from habits (for boss weakness, etc.)
+  const getCurrentMetricKeys = () => {
+    const ch = playerState.customHabits;
+    if (!ch) return METRIC_KEYS as unknown as string[];
+    return [
+      ...(ch.business || []).map(h => h.id),
+      ...(ch.health || []).map(h => h.id),
+      ...(ch.trainerBoosts || []).map(h => h.id),
+      ...(ch.statusEffects || []).map(h => h.id),
+    ];
+  };
+
+  // Filter quest templates to only include quests whose requirements reference existing habits
+  const getValidQuestTemplates = <T extends { requirements: { metric: string }[] }>(templates: T[]): T[] => {
+    const currentIds = getCurrentHabitIds();
+    return templates.filter(t =>
+      t.requirements.every(r => currentIds.has(r.metric))
+    );
+  };
+
   useEffect(() => {
     const today = getTodayISO();
     const currentWeek = getWeekId(new Date());
 
     // Daily Reset
     if (playerState.lastDailyReset !== today) {
-      // Pick 7 random daily quests from templates that match player level
-      const levelAppropriate = DAILY_QUEST_TEMPLATES.filter(t => {
+      // Filter templates to only those whose metrics exist in current habits
+      const validTemplates = getValidQuestTemplates(DAILY_QUEST_TEMPLATES);
+      const levelAppropriate = validTemplates.filter(t => {
         const min = (t as any).minLevel ?? 0;
         const max = (t as any).maxLevel ?? 999;
         return playerState.level >= min && playerState.level <= max;
@@ -837,8 +870,9 @@ export default function App() {
 
     // Weekly Reset
     if (playerState.lastWeeklyReset !== currentWeek) {
-      // Pick 4 random weekly quests from templates
-      const shuffled = [...WEEKLY_QUEST_TEMPLATES].sort(() => 0.5 - Math.random());
+      // Filter weekly templates to only those whose metrics exist in current habits
+      const validWeekly = getValidQuestTemplates(WEEKLY_QUEST_TEMPLATES);
+      const shuffled = [...validWeekly].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, 4);
 
       const newWeeklies: Quest[] = selected.map((t, i) => ({
@@ -851,12 +885,13 @@ export default function App() {
       }));
 
       // Create new boss
+      const dynamicKeys = getCurrentMetricKeys();
       const newBoss: WeeklyBoss = {
         weekId: currentWeek,
         name: BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)],
         hpTotal: 1000 + (playerState.level * 200),
         hpRemaining: 1000 + (playerState.level * 200),
-        weaknessType: METRIC_KEYS[Math.floor(Math.random() * METRIC_KEYS.length)],
+        weaknessType: dynamicKeys[Math.floor(Math.random() * dynamicKeys.length)] as any,
         defeated: false
       };
 
@@ -869,12 +904,17 @@ export default function App() {
       setBosses(prev => prev.filter(b => b.type === 'big' || !b.defeated));
     }
     
-    // Spawn mini-boss if none active
+    // Spawn mini-boss if none active (moved to a separate effect to avoid loop)
+  }, [playerState.lastDailyReset, playerState.lastWeeklyReset, playerState.level]);
+
+  // Separate effect for mini-boss spawning to avoid infinite loop
+  // (spawnMiniBoss calls setBosses which would re-trigger the main effect)
+  useEffect(() => {
     const activeMini = bosses.find(b => b.type === 'mini' && !b.defeated);
-    if (!activeMini && Math.random() < 0.3) { // 30% chance to spawn mini-boss each check
+    if (!activeMini && Math.random() < 0.3) {
       spawnMiniBoss();
     }
-  }, [playerState.lastDailyReset, playerState.lastWeeklyReset, playerState.level, bosses]);
+  }, [playerState.lastDailyReset]); // Only check on daily reset, not on every bosses change
 
   // Spawn a mini-boss
   const spawnMiniBoss = () => {
@@ -903,13 +943,14 @@ export default function App() {
       rewards.push({ type: 'xp', amount: xpAmount });
     }
     
+    const dynamicKeys = getCurrentMetricKeys();
     const newBoss: Boss = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'mini',
       name: miniBossData.name,
       hpTotal: baseHP,
       hpRemaining: baseHP,
-      weaknessType: METRIC_KEYS[Math.floor(Math.random() * METRIC_KEYS.length)],
+      weaknessType: dynamicKeys[Math.floor(Math.random() * dynamicKeys.length)] as any,
       defeated: false,
       spawnedAt: new Date().toISOString(),
       rewards
@@ -1022,58 +1063,61 @@ export default function App() {
         claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
       };
 
-      // Update daily metrics first
-      const newDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
-      setDailyMetrics(newDailyMetrics);
-      
-      // Calculate total XP from ALL days (this is the source of truth)
-      const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
-      const oldTotalXP = playerState.totalXP;
-      const totalXPDiff = newTotalXP - oldTotalXP;
-      
-      console.log('XP calculation:', { newTotalXP, oldTotalXP, totalXPDiff });
-      
-      // Update player's total XP to match the sum of all daily XP
-      setPlayerState(prevPlayer => {
-        const newLevel = getLevel(newTotalXP);
+      // Use functional updater to avoid stale closure over dailyMetrics
+      setDailyMetrics(prevDailyMetrics => {
+        const newDailyMetrics = { ...prevDailyMetrics, [targetDate]: updatedMetrics };
         
-        console.log('Level check:', { oldLevel: prevPlayer.level, newLevel });
+        // Calculate total XP from ALL days (this is the source of truth)
+        const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
         
-        let newEggs = [...(prevPlayer.eggs || [])];
-        if (newLevel > prevPlayer.level) {
-          // Give an egg based on level
-          const rarity = newLevel >= 21 ? 'legendary' : 
-                          newLevel >= 13 ? 'epic' : 
-                          newLevel >= 6 ? 'rare' : 'uncommon';
+        console.log('XP calculation:', { newTotalXP });
+        
+        // Update player's total XP to match the sum of all daily XP
+        setPlayerState(prevPlayer => {
+          const oldTotalXP = prevPlayer.totalXP;
+          const totalXPDiff = newTotalXP - oldTotalXP;
+          const newLevel = getLevel(newTotalXP);
           
-          const levelEgg: Egg = {
-            id: Math.random().toString(36).substr(2, 9),
-            rarity,
-            obtainedAt: new Date().toISOString(),
-            source: 'level'
+          console.log('Level check:', { oldLevel: prevPlayer.level, newLevel, totalXPDiff });
+          
+          let newEggs = [...(prevPlayer.eggs || [])];
+          if (newLevel > prevPlayer.level) {
+            const rarity = newLevel >= 21 ? 'legendary' : 
+                            newLevel >= 13 ? 'epic' : 
+                            newLevel >= 6 ? 'rare' : 'uncommon';
+            
+            const levelEgg: Egg = {
+              id: Math.random().toString(36).substr(2, 9),
+              rarity,
+              obtainedAt: new Date().toISOString(),
+              source: 'level'
+            };
+            
+            newEggs = [levelEgg, ...newEggs];
+            setNewDrop({ egg: levelEgg });
+            console.log('Level up! New egg added:', levelEgg);
+          }
+          
+          // Show animation for XP change
+          if (totalXPDiff !== 0) {
+            setShowXPGain(totalXPDiff);
+          }
+          
+          return {
+            ...prevPlayer,
+            totalXP: newTotalXP,
+            level: newLevel,
+            eggs: newEggs
           };
-          
-          newEggs = [levelEgg, ...newEggs];
-          setNewDrop({ egg: levelEgg });
-          console.log('Level up! New egg added:', levelEgg);
-        }
+        });
         
-        return {
-          ...prevPlayer,
-          totalXP: newTotalXP,
-          level: newLevel,
-          eggs: newEggs
-        };
+        return newDailyMetrics;
       });
       
-      // Show animation for XP change
-      if (totalXPDiff !== 0) {
-        setShowXPGain(totalXPDiff);
-      }
-      
-      // Check for milestone unlocks
+      // Check for milestone unlocks using the updated metrics
+      const updatedDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
       const unlockedMilestones = playerState.unlockedMilestones || [];
-      const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
+      const newlyUnlocked = checkMilestones(updatedDailyMetrics, unlockedMilestones);
       
       if (newlyUnlocked.length > 0) {
         console.log('Milestone unlocked:', newlyUnlocked[0]);
@@ -1494,14 +1538,29 @@ export default function App() {
       totalXP: 0,
       level: 0,
       monstersOwned: [],
+      eggs: [],
       questsSinceDrop: 0,
       lastDailyReset: '',
-      lastWeeklyReset: ''
+      lastWeeklyReset: '',
+      unlockedMilestones: [],
+      customHabits: {
+        business: DEFAULT_BUSINESS_HABITS,
+        health: DEFAULT_HEALTH_HABITS,
+        trainerBoosts: DEFAULT_TRAINER_BOOSTS,
+        statusEffects: DEFAULT_STATUS_EFFECTS
+      },
+      categoryVisibility: {
+        business: true,
+        health: true,
+        trainerBoosts: true,
+        statusEffects: true
+      }
     });
     setDailyMetrics({});
     setQuests([]);
     setWeeklyBoss(null);
     setBosses([]);
+    setTasks([]);
     
     // Force a clean reload
     window.location.reload();
@@ -1509,7 +1568,8 @@ export default function App() {
 
   const refreshQuests = () => {
     const today = getTodayISO();
-    const levelAppropriate = DAILY_QUEST_TEMPLATES.filter(t => {
+    const validTemplates = getValidQuestTemplates(DAILY_QUEST_TEMPLATES);
+    const levelAppropriate = validTemplates.filter(t => {
       const min = (t as any).minLevel ?? 0;
       const max = (t as any).maxLevel ?? 999;
       return playerState.level >= min && playerState.level <= max;
@@ -1562,7 +1622,7 @@ export default function App() {
       });
     } else {
       // Weekly: sum current week's data
-      const weekMetrics = (Object.values(dailyMetrics) as DailyMetrics[]).filter(m => getWeekId(new Date(m.date)) === currentWeek);
+      const weekMetrics = (Object.values(dailyMetrics) as DailyMetrics[]).filter(m => getWeekId(parseLocalDate(m.date)) === currentWeek);
       
       // Weekly quests require at least 7 days of logged data OR it's Sunday (end of week)
       const todayDate = new Date();
@@ -1603,7 +1663,7 @@ export default function App() {
         };
       });
     } else {
-      const weekMetrics = (Object.values(dailyMetrics) as DailyMetrics[]).filter(m => getWeekId(new Date(m.date)) === currentWeek);
+      const weekMetrics = (Object.values(dailyMetrics) as DailyMetrics[]).filter(m => getWeekId(parseLocalDate(m.date)) === currentWeek);
       return quest.requirements.map(req => {
         const total = weekMetrics.reduce((sum, m) => {
           const val = (m[req.metric] as any) === true ? 1 : (m[req.metric] as any) === false ? 0 : (m[req.metric] as number);
@@ -2033,7 +2093,7 @@ export default function App() {
         {entryToDelete && (
           <Modal
             title="Delete Entry"
-            message={`Are you sure you want to delete the entry for ${new Date(entryToDelete).toLocaleDateString()}?`}
+            message={`Are you sure you want to delete the entry for ${parseLocalDate(entryToDelete).toLocaleDateString()}?`}
             confirmLabel="Delete"
             onConfirm={() => deleteEntry(entryToDelete)}
             onCancel={() => setEntryToDelete(null)}
@@ -2044,7 +2104,7 @@ export default function App() {
 
       {/* Tab Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-[#E8E4D8] px-2 py-2 z-40">
-        <div className="max-w-2xl mx-auto flex justify-around items-center">
+        <div className="max-w-2xl mx-auto flex items-center overflow-x-auto scrollbar-hide gap-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
           <TabButton 
             active={activeTab === 'home'} 
             onClick={() => setActiveTab('home')} 
@@ -2886,7 +2946,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
   return (
     <button 
       onClick={onClick}
-      className={`flex flex-col items-center gap-1.5 px-5 py-2.5 rounded-2xl transition-all relative ${
+      className={`flex flex-col items-center gap-1.5 px-5 py-2.5 rounded-2xl transition-all relative flex-shrink-0 ${
         active ? 'text-blue-500 bg-blue-50 shadow-inner' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
       }`}
     >
@@ -2937,7 +2997,7 @@ function HomeTab({
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = toLocalISO(date);
       const metrics = dailyMetrics[dateStr];
       last7Days.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -3405,9 +3465,31 @@ function TodayTab({
 
   const [form, setForm] = useState(() => buildFormState(metrics));
 
+  // Use a stable reference for customHabits to avoid unnecessary form rebuilds
+  const customHabitsKey = useMemo(() => JSON.stringify(customHabits), [customHabits]);
+  
+  // Only rebuild form when the selected date changes, habits change, or metrics first load
+  // NOT when metrics object reference changes (which happens on every setPlayerState call)
+  const metricsRef = React.useRef(metrics);
+  const hadMetricsRef = React.useRef(!!metrics);
+  metricsRef.current = metrics;
+  
+  const prevDateRef = React.useRef(selectedDate);
+  const prevHabitsKeyRef = React.useRef(customHabitsKey);
+  
   useEffect(() => {
-    setForm(buildFormState(metrics));
-  }, [metrics, customHabits]);
+    const dateChanged = prevDateRef.current !== selectedDate;
+    const habitsChanged = prevHabitsKeyRef.current !== customHabitsKey;
+    const metricsFirstLoad = !hadMetricsRef.current && !!metrics;
+    
+    if (dateChanged || habitsChanged || metricsFirstLoad) {
+      console.log('TodayTab useEffect - rebuilding form:', { dateChanged, habitsChanged, metricsFirstLoad });
+      setForm(buildFormState(metricsRef.current));
+      prevDateRef.current = selectedDate;
+      prevHabitsKeyRef.current = customHabitsKey;
+      hadMetricsRef.current = !!metrics;
+    }
+  }, [selectedDate, customHabitsKey, metrics]);
 
   const handleChange = (key: string, val: any) => {
     setForm(prev => ({ ...prev, [key]: val }));
@@ -3541,6 +3623,7 @@ function TodayTab({
                       checked={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'dropdown' && habit.options) {
@@ -3551,6 +3634,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       options={habit.options}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'text') {
@@ -3561,6 +3645,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else {
@@ -3574,6 +3659,7 @@ function TodayTab({
                       step={habit.step}
                       min={habit.min}
                       max={habit.max}
+                      sprite={habit.sprite}
                     />
                   );
                 }
@@ -3612,6 +3698,7 @@ function TodayTab({
                       checked={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'dropdown' && habit.options) {
@@ -3622,6 +3709,7 @@ function TodayTab({
                       value={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       options={habit.options}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'text') {
@@ -3632,6 +3720,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.id === 'timeAsleep' || habit.id === 'timeAwake') {
@@ -3642,6 +3731,7 @@ function TodayTab({
                       value={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else {
@@ -3655,6 +3745,7 @@ function TodayTab({
                       step={habit.step}
                       min={habit.min}
                       max={habit.max}
+                      sprite={habit.sprite}
                     />
                   );
                 }
@@ -3694,6 +3785,7 @@ function TodayTab({
                       checked={value} 
                       onChange={v => handleChange(habit.id, v)} 
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'text') {
@@ -3704,6 +3796,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'dropdown' && habit.options) {
@@ -3714,6 +3807,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       options={habit.options}
+                      sprite={habit.sprite}
                     />
                   );
                 } else {
@@ -3727,6 +3821,7 @@ function TodayTab({
                       step={habit.step}
                       min={habit.min}
                       max={habit.max}
+                      sprite={habit.sprite}
                     />
                   );
                 }
@@ -3771,6 +3866,7 @@ function TodayTab({
                       onChange={v => handleChange(habit.id, v)} 
                       variant="danger" 
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'text') {
@@ -3781,6 +3877,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       metricKey={habit.id}
+                      sprite={habit.sprite}
                     />
                   );
                 } else if (habit.type === 'dropdown' && habit.options) {
@@ -3791,6 +3888,7 @@ function TodayTab({
                       value={value}
                       onChange={v => handleChange(habit.id, v)}
                       options={habit.options}
+                      sprite={habit.sprite}
                     />
                   );
                 } else {
@@ -3805,6 +3903,7 @@ function TodayTab({
                       min={habit.min}
                       max={habit.max}
                       variant="danger"
+                      sprite={habit.sprite}
                     />
                   );
                 }
@@ -3886,7 +3985,7 @@ const METRIC_SPRITES: Record<string, number> = {
   gaming: 137, // Porygon
 };
 
-function InputGroup({ label, value, onChange, metricKey, step = "1", variant = "default", min, max }: { 
+function InputGroup({ label, value, onChange, metricKey, step = "1", variant = "default", min, max, sprite }: { 
   label: string, 
   value: number, 
   onChange: (v: string) => void, 
@@ -3894,9 +3993,10 @@ function InputGroup({ label, value, onChange, metricKey, step = "1", variant = "
   step?: string,
   variant?: "default" | "danger",
   min?: number,
-  max?: number
+  max?: number,
+  sprite?: number
 }) {
-  const pokemonId = METRIC_SPRITES[metricKey] || 25;
+  const pokemonId = sprite || METRIC_SPRITES[metricKey] || 25;
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
 
   const isDanger = variant === "danger";
@@ -3927,13 +4027,14 @@ function InputGroup({ label, value, onChange, metricKey, step = "1", variant = "
   );
 }
 
-function DropdownGroup({ label, value, onChange, options }: { 
+function DropdownGroup({ label, value, onChange, options, sprite }: { 
   label: string, 
   value: string, 
   onChange: (v: string) => void,
-  options: string[]
+  options: string[],
+  sprite?: number
 }) {
-  const pokemonId = 68; // Machamp for exercise
+  const pokemonId = sprite || 68;
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
 
   return (
@@ -3962,13 +4063,14 @@ function DropdownGroup({ label, value, onChange, options }: {
   );
 }
 
-function TimeInputGroup({ label, value, onChange, metricKey }: { 
+function TimeInputGroup({ label, value, onChange, metricKey, sprite }: { 
   label: string, 
   value: string, 
   onChange: (v: string) => void,
-  metricKey: string
+  metricKey: string,
+  sprite?: number
 }) {
-  const pokemonId = METRIC_SPRITES[metricKey] || 143;
+  const pokemonId = sprite || METRIC_SPRITES[metricKey] || 143;
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
 
   return (
@@ -3994,15 +4096,16 @@ function TimeInputGroup({ label, value, onChange, metricKey }: {
   );
 }
 
-function CheckboxGroup({ label, checked, onChange, variant = "default", metricKey }: { 
+function CheckboxGroup({ label, checked, onChange, variant = "default", metricKey, sprite }: { 
   label: string, 
   checked: boolean, 
   onChange: (v: boolean) => void,
   variant?: "default" | "danger",
-  metricKey?: string
+  metricKey?: string,
+  sprite?: number
 }) {
   const isDanger = variant === "danger";
-  const pokemonId = metricKey ? (METRIC_SPRITES[metricKey] || 25) : 25;
+  const pokemonId = sprite || (metricKey ? (METRIC_SPRITES[metricKey] || 25) : 25);
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
 
   return (
@@ -4026,13 +4129,14 @@ function CheckboxGroup({ label, checked, onChange, variant = "default", metricKe
   );
 }
 
-function TextInputGroup({ label, value, onChange, metricKey }: { 
+function TextInputGroup({ label, value, onChange, metricKey, sprite }: { 
   label: string, 
   value: string, 
   onChange: (v: string) => void, 
-  metricKey: string
+  metricKey: string,
+  sprite?: number
 }) {
-  const pokemonId = METRIC_SPRITES[metricKey] || 25;
+  const pokemonId = sprite || METRIC_SPRITES[metricKey] || 25;
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemonId}.gif`;
 
   return (
@@ -4126,7 +4230,7 @@ const QuestCard: React.FC<QuestCardProps> = ({ quest, onClaim, completed, progre
   // Check if it's a weekly quest and if we have enough days
   const isWeekly = quest.type === 'weekly';
   const currentWeek = getWeekId(new Date());
-  const weekMetrics = isWeekly ? Object.values(dailyMetrics).filter((m: any) => getWeekId(new Date(m.date)) === currentWeek) : [];
+  const weekMetrics = isWeekly ? Object.values(dailyMetrics).filter((m: any) => getWeekId(parseLocalDate(m.date)) === currentWeek) : [];
   const daysLogged = weekMetrics.length;
   const todayDate = new Date();
   const dayOfWeek = todayDate.getDay(); // 0 = Sunday
@@ -5229,7 +5333,7 @@ function HistoryTab({ metrics, tasks, syncSettings, syncStatus, backupStatus, cl
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toLocalISO(d);
       const dayMetrics = metrics[dateStr];
       data.push({
         date: dateStr,
@@ -5780,6 +5884,22 @@ function HabitManagerModal({
   const handleSubmit = () => {
     if (!formData.label || !formData.xpValue) return;
 
+    // Collect all sprite IDs currently in use across all categories
+    const usedSprites = new Set<number>();
+    Object.values(customHabits).forEach(habits => {
+      habits.forEach(h => {
+        if (h.sprite) usedSprites.add(h.sprite);
+      });
+    });
+
+    // Generate a random sprite ID (1-493 for Gen 1-4) that isn't already used
+    let randomSprite: number;
+    let attempts = 0;
+    do {
+      randomSprite = Math.floor(Math.random() * 493) + 1;
+      attempts++;
+    } while (usedSprites.has(randomSprite) && attempts < 100);
+
     const habit: HabitDefinition = {
       id: editingHabit?.id || `custom_${Date.now()}`,
       label: formData.label!,
@@ -5788,6 +5908,7 @@ function HabitManagerModal({
       step: formData.step,
       min: formData.min,
       max: formData.max,
+      sprite: formData.sprite || editingHabit?.sprite || randomSprite,
       isNegative: activeCategory === 'statusEffects'
     };
 
@@ -5810,7 +5931,8 @@ function HabitManagerModal({
       xpValue: habit.xpValue,
       step: habit.step,
       min: habit.min,
-      max: habit.max
+      max: habit.max,
+      sprite: habit.sprite
     });
     setShowAddForm(true);
   };

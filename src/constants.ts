@@ -13,6 +13,7 @@ export const DEFAULT_BUSINESS_HABITS: HabitDefinition[] = [
   { id: 'postsCreated', label: 'Posts Created', type: 'number', xpValue: 20, sprite: 235 },
   { id: 'postsPosted', label: 'Posts Posted', type: 'number', xpValue: 30, sprite: 149 },
   { id: 'callsBooked', label: 'Calls Booked', type: 'number', xpValue: 50, sprite: 113 },
+  { id: 'callsTaken', label: 'Calls Taken', type: 'number', xpValue: 40, sprite: 242 },
 ];
 
 export const DEFAULT_HEALTH_HABITS: HabitDefinition[] = [
@@ -29,6 +30,7 @@ export const DEFAULT_TRAINER_BOOSTS: HabitDefinition[] = [
   { id: 'visualizations', label: 'Visualizations', type: 'boolean', xpValue: 15, sprite: 96 },
   { id: 'planTomorrow', label: 'Plan Tomorrow', type: 'boolean', xpValue: 15, sprite: 233 },
   { id: 'storyList', label: 'Story List', type: 'boolean', xpValue: 15, sprite: 83 },
+  { id: 'journal', label: 'Journal', type: 'boolean', xpValue: 20, sprite: 102 },
 ];
 
 export const DEFAULT_STATUS_EFFECTS: HabitDefinition[] = [
@@ -190,11 +192,11 @@ export const MINI_BOSS_NAMES = MINI_BOSS_DATA.map(b => b.name);
 export const METRIC_KEYS = [
   // Main Attacks (Business)
   'workHours', 'discoveryCalls', 'deliveryCalls', 'networkingCalls', 'salesCalls', 'firstDmsSent', 'followUpsSent', 
-  'commentingMinutes', 'postsCreated', 'postsPosted', 'callsBooked',
+  'commentingMinutes', 'postsCreated', 'postsPosted', 'callsBooked', 'callsTaken',
   // Special Moves (Health)
   'timeAsleep', 'timeAwake', 'coldShowers', 'fastHours', 'exerciseType', 'foodTracking',
   // Trainer Boosts (Daily Habits)
-  'affirmations', 'visualizations', 'planTomorrow', 'storyList',
+  'affirmations', 'visualizations', 'planTomorrow', 'storyList', 'journal',
   // Status Effects (Bad Habits)
   'youtube', 'reels', 'shorts', 'processedFood', 'gaming'
 ] as const;
