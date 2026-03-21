@@ -2102,7 +2102,7 @@ export default function App() {
 
       {/* Tab Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-[#E8E4D8] px-2 py-2 z-40">
-        <div className="max-w-2xl mx-auto flex items-center overflow-x-auto scrollbar-hide gap-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <div className="max-w-2xl mx-auto flex items-center justify-center overflow-x-auto scrollbar-hide gap-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
           <TabButton 
             active={activeTab === 'home'} 
             onClick={() => setActiveTab('home')} 
