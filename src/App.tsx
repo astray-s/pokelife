@@ -1063,61 +1063,59 @@ export default function App() {
         claimedQuestIds: dailyMetrics[targetDate]?.claimedQuestIds || []
       };
 
-      // Use functional updater to avoid stale closure over dailyMetrics
-      setDailyMetrics(prevDailyMetrics => {
-        const newDailyMetrics = { ...prevDailyMetrics, [targetDate]: updatedMetrics };
+      // Build new daily metrics using functional updater to avoid stale closure
+      // but compute the total XP outside of nested updaters
+      const newDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
+      setDailyMetrics(prev => ({ ...prev, [targetDate]: updatedMetrics }));
+      
+      // Calculate total XP from ALL days (this is the source of truth)
+      const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
+      const oldTotalXP = playerState.totalXP;
+      const totalXPDiff = newTotalXP - oldTotalXP;
+      
+      console.log('XP calculation:', { newTotalXP, oldTotalXP, totalXPDiff });
+      
+      // Update player's total XP to match the sum of all daily XP
+      setPlayerState(prevPlayer => {
+        const newLevel = getLevel(newTotalXP);
         
-        // Calculate total XP from ALL days (this is the source of truth)
-        const newTotalXP = (Object.values(newDailyMetrics) as DailyMetrics[]).reduce((sum, m) => sum + m.xpEarned, 0);
+        console.log('Level check:', { oldLevel: prevPlayer.level, newLevel });
         
-        console.log('XP calculation:', { newTotalXP });
-        
-        // Update player's total XP to match the sum of all daily XP
-        setPlayerState(prevPlayer => {
-          const oldTotalXP = prevPlayer.totalXP;
-          const totalXPDiff = newTotalXP - oldTotalXP;
-          const newLevel = getLevel(newTotalXP);
+        let newEggs = [...(prevPlayer.eggs || [])];
+        if (newLevel > prevPlayer.level) {
+          const rarity = newLevel >= 21 ? 'legendary' : 
+                          newLevel >= 13 ? 'epic' : 
+                          newLevel >= 6 ? 'rare' : 'uncommon';
           
-          console.log('Level check:', { oldLevel: prevPlayer.level, newLevel, totalXPDiff });
-          
-          let newEggs = [...(prevPlayer.eggs || [])];
-          if (newLevel > prevPlayer.level) {
-            const rarity = newLevel >= 21 ? 'legendary' : 
-                            newLevel >= 13 ? 'epic' : 
-                            newLevel >= 6 ? 'rare' : 'uncommon';
-            
-            const levelEgg: Egg = {
-              id: Math.random().toString(36).substr(2, 9),
-              rarity,
-              obtainedAt: new Date().toISOString(),
-              source: 'level'
-            };
-            
-            newEggs = [levelEgg, ...newEggs];
-            setNewDrop({ egg: levelEgg });
-            console.log('Level up! New egg added:', levelEgg);
-          }
-          
-          // Show animation for XP change
-          if (totalXPDiff !== 0) {
-            setShowXPGain(totalXPDiff);
-          }
-          
-          return {
-            ...prevPlayer,
-            totalXP: newTotalXP,
-            level: newLevel,
-            eggs: newEggs
+          const levelEgg: Egg = {
+            id: Math.random().toString(36).substr(2, 9),
+            rarity,
+            obtainedAt: new Date().toISOString(),
+            source: 'level'
           };
-        });
+          
+          newEggs = [levelEgg, ...newEggs];
+          // Schedule drop popup after state update
+          setTimeout(() => setNewDrop({ egg: levelEgg }), 0);
+          console.log('Level up! New egg added:', levelEgg);
+        }
         
-        return newDailyMetrics;
+        return {
+          ...prevPlayer,
+          totalXP: newTotalXP,
+          level: newLevel,
+          eggs: newEggs
+        };
       });
       
-      // Check for milestone unlocks using the updated metrics
-      const updatedDailyMetrics = { ...dailyMetrics, [targetDate]: updatedMetrics };
+      // Show animation for XP change
+      if (totalXPDiff !== 0) {
+        setShowXPGain(totalXPDiff);
+      }
+      
+      // Check for milestone unlocks
       const unlockedMilestones = playerState.unlockedMilestones || [];
-      const newlyUnlocked = checkMilestones(updatedDailyMetrics, unlockedMilestones);
+      const newlyUnlocked = checkMilestones(newDailyMetrics, unlockedMilestones);
       
       if (newlyUnlocked.length > 0) {
         console.log('Milestone unlocked:', newlyUnlocked[0]);
